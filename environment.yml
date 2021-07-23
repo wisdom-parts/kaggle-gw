@@ -12,4 +12,6 @@ dependencies:
   - cudatoolkit=11.1
   - torchvision
   - torchaudio
+  - pandas
+  - seaborn
 prefix: /home/ec2-user/.conda/envs/kaggle-gw
