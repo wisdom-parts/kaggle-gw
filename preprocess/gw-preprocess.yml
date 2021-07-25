@@ -1,0 +1,10 @@
+name: gw-preprocess
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - pycbc
+  - python
+  - pandas
+  - conda
+prefix: /Users/dean/miniconda3/envs/gw-preprocess
