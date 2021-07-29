@@ -1,0 +1,7 @@
+name: gw-jupyter
+channels:
+  - defaults
+dependencies:
+  - jupyter
+  - jupyterlab
+  - nb_conda_kernels

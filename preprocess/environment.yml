@@ -4,9 +4,8 @@ channels:
   - defaults
 dependencies:
   - typeguard
-  - jupyterlab
-  - jupyter
   - pycbc
   - python
   - pandas
-  - conda
+  - seaborn
+  - ipykernel
