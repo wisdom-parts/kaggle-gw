@@ -2,37 +2,39 @@ import argparse
 import enum
 import os
 from pathlib import Path
+import shutil
+from typing import Callable, Mapping
+
+from .filter_sig import filter_sig
+
+SAMPLE_SUBMISSION_FILENAME = 'sample_submission.csv'
+TRAINING_LABELS_FILENAME = 'training_labels.csv'
+TRAIN_DIRNAME = 'train'
+TEST_DIRNAME = 'test'
 
 
-# With thanks to Tim for this stack overflow answer: https://stackoverflow.com/a/60750535
-class EnumAction(argparse.Action):
-    """
-    Argparse action for handling Enums
-    """
-    def __init__(self, **kwargs):
-        # Pop off the type value
-        enum_type = kwargs.pop("type", None)
+def sample_submission_file(data_dir: Path) -> Path:
+    return data_dir / SAMPLE_SUBMISSION_FILENAME
 
-        # Ensure an Enum subclass is provided
-        if enum_type is None:
-            raise ValueError("type must be assigned an Enum when using EnumAction")
-        if not issubclass(enum_type, enum.Enum):
-            raise TypeError("type must be an Enum when using EnumAction")
 
-        # Generate choices from the Enum
-        kwargs.setdefault("choices", tuple(e.value for e in enum_type))
+def training_labels_file(data_dir: Path) -> Path:
+    return data_dir / TRAINING_LABELS_FILENAME
 
-        super(EnumAction, self).__init__(**kwargs)
 
-        self._enum = enum_type
+def train_dir(data_dir: Path) -> Path:
+    return data_dir / TRAIN_DIRNAME
 
-    def __call__(self, parser, namespace, values, option_string=None):
-        # Convert value back into an Enum
-        value = self._enum(values)
-        setattr(namespace, self.dest, value)
 
-class Processor(enum.Enum):
-    
+def test_dir(data_dir: Path) -> Path:
+    return data_dir / TEST_DIRNAME
+
+
+ProcessorFunType = Callable[[Path, Path, bool], None]
+
+processors: Mapping[str, ProcessorFunType] = {
+    'filter_sig': filter_sig
+}
+
 
 def existing_dir_path(s: str) -> Path:
     if os.path.isdir(s):
@@ -40,18 +42,40 @@ def existing_dir_path(s: str) -> Path:
     else:
         raise NotADirectoryError(s)
 
-def preprocess(source: Path, dest: Path):
-    pass
+
+def preprocess(processor: ProcessorFunType,
+               source: Path, dest: Path):
+    if not os.path.isdir(source):
+        raise NotADirectoryError(f'source directory doesn\'t exist: {source}')
+    if os.path.exists(dest):
+        raise FileExistsError(f'destination directory already exists: {dest}')
+    if not os.path.isfile(sample_submission_file(source)):
+        raise FileNotFoundError(f'missing {SAMPLE_SUBMISSION_FILENAME} in {source}')
+    if not os.path.isfile(training_labels_file(source)):
+        raise FileNotFoundError(f'missing {TRAINING_LABELS_FILENAME} in {source}')
+    if not os.path.isdir(train_dir(source)):
+        raise NotADirectoryError(f'missing {TRAIN_DIRNAME} in {source}')
+    if not os.path.isdir(test_dir(source)):
+        raise NotADirectoryError(f'missing {TEST_DIRNAME} in {source}')
+
+    os.makedirs(dest, exist_ok=True)
+
+    shutil.copy(sample_submission_file(source),
+                sample_submission_file(dest))
+    shutil.copy(training_labels_file(source),
+                training_labels_file(dest))
 
 
 if __name__ == '__main__':
     arg_parser = argparse.ArgumentParser()
-    arg_parser.add_argument('processor')
+    arg_parser.add_argument('processor',
+                            help='which processor to run',
+                            choices=processors.keys())
     arg_parser.add_argument('source',
-                            'directory containing the input dataset, in the original g2net directory structure',
+                            help='directory containing the input dataset, in the original g2net directory structure',
                             type=existing_dir_path)
     arg_parser.add_argument('dest',
-                            'directory for the output dataset, in the original g2net directory structure',
+                            help='directory for the output dataset, in the original g2net directory structure',
                             type=Path)
     args = arg_parser.parse_args()
-    preprocess(args.source, args.dest)
+    preprocess(processors[args.processor], args.source, args.dest)
