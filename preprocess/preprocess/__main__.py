@@ -65,6 +65,12 @@ def preprocess(processor: ProcessorFunType,
     shutil.copy(training_labels_file(source),
                 training_labels_file(dest))
 
+    def process_npy_dir(dirname: str, is_train: bool):
+        pass
+
+    process_npy_dir(TRAIN_DIRNAME, is_train=True)
+    process_npy_dir(TEST_DIRNAME, is_train=False)
+
 
 if __name__ == '__main__':
     arg_parser = argparse.ArgumentParser()
