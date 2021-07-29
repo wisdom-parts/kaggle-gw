@@ -127,3 +127,9 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+# MacOS special
+.DS_Store
+
+# Non-shareable PyCharm config files
+MypyConfig.xml
