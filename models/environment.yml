@@ -1,11 +1,10 @@
-name: kaggle-gw
+name: gw-models
 channels:
   - nvidia
   - pytorch
   - conda-forge
 dependencies:
   - typeguard
-  - pycbc
   - jupyterlab
   - jupyter
   - pytorch
@@ -14,4 +13,3 @@ dependencies:
   - torchaudio
   - pandas
   - seaborn
-prefix: /home/ec2-user/.conda/envs/kaggle-gw

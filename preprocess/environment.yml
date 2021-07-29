@@ -3,8 +3,10 @@ channels:
   - conda-forge
   - defaults
 dependencies:
+  - typeguard
+  - jupyterlab
+  - jupyter
   - pycbc
   - python
   - pandas
   - conda
-prefix: /Users/dean/miniconda3/envs/gw-preprocess
