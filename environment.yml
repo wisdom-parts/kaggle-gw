@@ -1,0 +1,21 @@
+name: kaggle-gw
+channels:
+  - nvidia
+  - pytorch
+  - conda-forge
+  - defaults
+dependencies:
+  - cudatoolkit
+  - ipykernel
+  - jupyter
+  - jupyterlab
+  - mypy
+  - pandas
+  - pycbc
+  - pytest
+  - python
+  - pytorch
+  - seaborn
+  - torchaudio
+  - torchvision
+  - typeguard
