@@ -32,8 +32,8 @@ def bandpass_ts(ts: TimeSeries, lf: float = 35.0, hf: float = 350.0) -> TimeSeri
 def process_sig(sig: np.ndarray) -> np.ndarray:
     from pycbc.psd import welch, interpolate
 
-    if sig.shape != (SIGNAL_LEN, ):
-        raise ValueError(f'unexpected sigs shape: {sig.shape}')
+    if sig.shape != (SIGNAL_LEN,):
+        raise ValueError(f"unexpected sigs shape: {sig.shape}")
 
     windowed = timeseries_from_signal(window(sig))
     high = pycbc.filter.highpass(windowed, 15, 8)
@@ -63,5 +63,5 @@ def process_sig(sig: np.ndarray) -> np.ndarray:
 
 def process(sigs: np.ndarray) -> np.ndarray:
     if sigs.shape != (N_SIGNALS, SIGNAL_LEN):
-        raise ValueError(f'unexpected sigs shape: {sigs.shape}')
+        raise ValueError(f"unexpected sigs shape: {sigs.shape}")
     return np.stack([process_sig(sig) for sig in sigs])
