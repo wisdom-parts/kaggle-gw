@@ -3,7 +3,7 @@ import scipy.signal
 import pycbc
 import pycbc.filter
 from pycbc.types import TimeSeries
-from g2net import DELTA_T, N_SIGNALS, SIGNAL_LEN
+from gw_util import DELTA_T, N_SIGNALS, SIGNAL_LEN
 from typing import List
 
 # Given that the most visible signals I have looked at
