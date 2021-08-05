@@ -11,6 +11,7 @@ dependencies:
   - jupyterlab
   - mypy
   - pandas
+  - pre-commit
   - pycbc
   - pytest
   - python
