@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 
 N_SIGNALS = 3
@@ -39,3 +40,16 @@ def test_dir(data_dir: Path) -> Path:
 
 def test_file(data_dir: Path, example_id: str) -> Path:
     return test_dir(data_dir) / relative_example_path(example_id)
+
+
+def validate_source_dir(source_dir):
+    if not os.path.isdir(source_dir):
+        raise NotADirectoryError(f"source directory doesn't exist: {source_dir}")
+    if not os.path.isfile(sample_submission_file(source_dir)):
+        raise FileNotFoundError(f"missing {SAMPLE_SUBMISSION_FILENAME} in {source_dir}")
+    if not os.path.isfile(training_labels_file(source_dir)):
+        raise FileNotFoundError(f"missing {TRAINING_LABELS_FILENAME} in {source_dir}")
+    if not os.path.isdir(train_dir(source_dir)):
+        raise NotADirectoryError(f"missing {TRAIN_DIRNAME} in {source_dir}")
+    if not os.path.isdir(test_dir(source_dir)):
+        raise NotADirectoryError(f"missing {TEST_DIRNAME} in {source_dir}")
