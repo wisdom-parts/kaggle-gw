@@ -55,6 +55,8 @@ def preprocess_train_or_test(
             if count % 1000 == 0:
                 print(f"processed {count} rows")
 
+    print("Done!")
+
 
 def preprocess(processor: ProcessFunction, source: Path, dest: Path):
     if not os.path.isdir(source):
