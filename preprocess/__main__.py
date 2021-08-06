@@ -31,7 +31,17 @@ def preprocess_train_or_test(
         for j in hex_low:
             for k in hex_low:
                 (dest / i / j / k).mkdir(parents=True)
+    print("======================")
+    print(f"Preprocessing {source} -> {dest}")
+
+    count = 0
     with open(ids_file) as id_rows:
+        for row in id_rows:
+            count += 1
+    print(f"{count} rows to process")
+
+    with open(ids_file) as id_rows:
+        count = 0
         skipped_header = False
         for row in id_rows:
             if not skipped_header:
@@ -41,6 +51,9 @@ def preprocess_train_or_test(
                 example_path = relative_example_path(example_id)
                 x = np.load(str(source / example_path))
                 np.save(str(dest / example_path), processor(x))
+            count += 1
+            if count % 1000 == 0:
+                print(f"processed {count} rows")
 
 
 def preprocess(processor: ProcessFunction, source: Path, dest: Path):
