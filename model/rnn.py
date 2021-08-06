@@ -15,27 +15,44 @@ class RnnHyperParameters:
     n_layers: int = 1
     n_epochs: int = 20
     lr: float = 0.01
+    bidirectional: bool = True
 
 
 class Rnn(nn.Module):
     def __init__(self, hp: RnnHyperParameters):
         super().__init__()
         self.hp = hp
+        self.num_directions = 2 if self.hp.bidirectional else 1
+        self.rnn_out_channels = self.num_directions * self.hp.hidden_dim
 
         self.rnn = nn.RNN(N_SIGNALS, hp.hidden_dim, hp.n_layers, batch_first=True)
-        self.fc = nn.Linear(hp.hidden_dim, 2)
 
-    def forward(self, x: Tensor) -> Tuple[Tensor, Tensor]:
+        # convolution from the RNN's output at each point in the sequence to logits for target= 0 versus 1
+        # noinspection PyTypeChecker
+        self.conv = nn.Conv1d(in_channels=self.rnn_out_channels,
+                              out_channels=2,
+                              kernel_size=1)
+
+    def forward(self, x: Tensor) -> Tensor:
         batch_size = x.size()[0]
+        assert x.size() == (batch_size, SIGNAL_LEN, N_SIGNALS)
 
-        out, hidden = self.rnn(x, self.initial_hidden(batch_size))
-        out = out.contiguous().view(-1, self.hp.hidden_dim)
-        out = self.fc(out)
+        out, _ = self.rnn(x, self.initial_hidden(batch_size),
+                          batch_first=True, bidirectional=self.hp.bidirectional)
+        assert out.size() == (batch_size, SIGNAL_LEN, self.rnn_out_channels)
 
-        return out, hidden
+        out = self.conv(out)
+        assert out.size() == (batch_size, SIGNAL_LEN, 2)
+
+        out = torch.mean(out, dim=1)
+        assert out.size() == (batch_size, 2)
+
+        return out
 
     def initial_hidden(self, batch_size: int) -> Tensor:
-        return torch.zeros(self.hp.n_layers, batch_size, self.hp.hidden_dim)
+        return torch.zeros(self.num_directions, self.hp.n_layers,
+                           batch_size,
+                           self.hp.hidden_dim)
 
 
 class RnnManager(ModelManager):
