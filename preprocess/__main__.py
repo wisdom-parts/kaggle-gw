@@ -59,22 +59,10 @@ def preprocess_train_or_test(
 
 
 def preprocess(processor: ProcessFunction, source: Path, dest: Path):
-    if not os.path.isdir(source):
-        raise NotADirectoryError(f"source directory doesn't exist: {source}")
-    if os.path.exists(dest):
-        raise FileExistsError(f"destination directory already exists: {dest}")
-    if not os.path.isfile(sample_submission_file(source)):
-        raise FileNotFoundError(f"missing {SAMPLE_SUBMISSION_FILENAME} in {source}")
-    if not os.path.isfile(training_labels_file(source)):
-        raise FileNotFoundError(f"missing {TRAINING_LABELS_FILENAME} in {source}")
-    if not os.path.isdir(train_dir(source)):
-        raise NotADirectoryError(f"missing {TRAIN_DIRNAME} in {source}")
-    if not os.path.isdir(test_dir(source)):
-        raise NotADirectoryError(f"missing {TEST_DIRNAME} in {source}")
+    has_test_data = validate_source_dir(source)
 
     os.makedirs(dest, exist_ok=True)
 
-    shutil.copy(sample_submission_file(source), sample_submission_file(dest))
     shutil.copy(training_labels_file(source), training_labels_file(dest))
 
     preprocess_train_or_test(
@@ -84,12 +72,14 @@ def preprocess(processor: ProcessFunction, source: Path, dest: Path):
         dest=train_dir(dest),
     )
 
-    preprocess_train_or_test(
-        processor,
-        sample_submission_file(source),
-        source=test_dir(source),
-        dest=test_dir(dest),
-    )
+    if has_test_data:
+        shutil.copy(sample_submission_file(source), sample_submission_file(dest))
+        preprocess_train_or_test(
+            processor,
+            sample_submission_file(source),
+            source=test_dir(source),
+            dest=test_dir(dest),
+        )
 
 
 if __name__ == "__main__":

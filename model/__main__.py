@@ -15,7 +15,7 @@ models: Mapping[str, Type[ModelManager]] = {"rnn": rnn.RnnManager}
 
 
 def train_model(manager: ModelManager, source: Path):
-    validate_source_dir(source)
+    have_test_data = validate_source_dir(source)
 
     device_name = "cuda" if torch.cuda.is_available() else "cpu"
     print(f"Using device {device_name}")
