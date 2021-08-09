@@ -1,13 +1,13 @@
 from dataclasses import dataclass
-from typing import Callable, Optional
+from typing import Callable
 
 import numpy as np
 import torch
 from torch import nn, Tensor
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import DataLoader
 
-from model import ModelManager, GwDataset, gw_train_and_test_datasets
 from gw_util import *
+from model import ModelManager, gw_train_and_test_datasets
 
 
 @dataclass()
@@ -112,7 +112,7 @@ class RnnManager(ModelManager):
             if batch_num % 100 == 0:
                 loss_val = loss.item()
                 i = batch_num * len(X)
-                print(f"training loss: {loss:>7f}  [{i:>5d}/{num_examples:>5d}]")
+                print(f"training loss: {loss_val:>7f}  [{i:>5d}/{num_examples:>5d}]")
 
     def test(self, model: Rnn, loss_fn: Callable[[Tensor, Tensor], Tensor],
              dataloader: DataLoader, num_examples: int):

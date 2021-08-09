@@ -1,22 +1,18 @@
 import argparse
 from typing import Type, Mapping
 
-from torch.utils.data import random_split
-from torchvision.transforms import ToTensor, Lambda
+import torch
 
 from gw_util import *
 from gw_util import validate_source_dir
-
-from model import ModelManager, GwDataset
+from model import ModelManager
 from model import rnn
-
-import torch
 
 models: Mapping[str, Type[ModelManager]] = {"rnn": rnn.RnnManager}
 
 
 def train_model(manager: ModelManager, source: Path):
-    have_test_data = validate_source_dir(source)
+    validate_source_dir(source)
 
     device_name = "cuda" if torch.cuda.is_available() else "cpu"
     print(f"Using device {device_name}")
