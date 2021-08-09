@@ -12,8 +12,8 @@ from model import ModelManager, gw_train_and_test_datasets
 
 @dataclass()
 class RnnHyperParameters:
-    hidden_dim: int = 17
-    n_layers: int = 1
+    hidden_dim: int = 31
+    n_layers: int = 3
     n_epochs: int = 20
     lr: float = 0.01
     bidirectional: bool = True
