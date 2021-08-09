@@ -1,11 +1,12 @@
 from dataclasses import dataclass
-from typing import Callable
+from typing import Callable, Optional
 
+import numpy as np
 import torch
 from torch import nn, Tensor
 from torch.utils.data import Dataset, DataLoader
 
-from model import ModelManager, GwDataset
+from model import ModelManager, GwDataset, gw_train_and_test_datasets
 from gw_util import *
 
 
@@ -68,11 +69,16 @@ class Rnn(nn.Module):
 
 class RnnManager(ModelManager):
     def train(self,
-              train_dataset: GwDataset,
-              test_dataset: GwDataset,
+              source: Path,
               device: torch.device):
 
         hp = RnnHyperParameters()
+
+        def transform(x: np.ndarray):
+            return torch.tensor(x, dtype=hp.dtype, device=device)
+
+        train_dataset, test_dataset = gw_train_and_test_datasets(source, transform)
+
         model = Rnn(hp, device=device)
         model.to(device, dtype=hp.dtype)
 
@@ -93,7 +99,7 @@ class RnnManager(ModelManager):
                     hp: RnnHyperParameters):
         optimizer = torch.optim.Adam(model.parameters(), lr=hp.lr)
 
-        for batch, (X, y) in enumerate(dataloader):
+        for batch_num, (X, y) in enumerate(dataloader):
             # Compute prediction and loss
             pred = model(X)
             loss = loss_fn(pred, y)
@@ -103,9 +109,10 @@ class RnnManager(ModelManager):
             loss.backward()
             optimizer.step()
 
-            if batch % 100 == 0:
-                loss, current = loss.item(), batch * len(X)
-                print(f"training loss: {loss:>7f}  [{current:>5d}/{num_examples:>5d}]")
+            if batch_num % 100 == 0:
+                loss_val = loss.item()
+                i = batch_num * len(X)
+                print(f"training loss: {loss:>7f}  [{i:>5d}/{num_examples:>5d}]")
 
     def test(self, model: Rnn, loss_fn: Callable[[Tensor, Tensor], Tensor],
              dataloader: DataLoader, num_examples: int):

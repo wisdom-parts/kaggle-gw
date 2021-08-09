@@ -2,6 +2,7 @@ import argparse
 from typing import Type, Mapping
 
 from torch.utils.data import random_split
+from torchvision.transforms import ToTensor, Lambda
 
 from gw_util import *
 from gw_util import validate_source_dir
@@ -21,13 +22,7 @@ def train_model(manager: ModelManager, source: Path):
     print(f"Using device {device_name}")
     device = torch.device(device_name)
 
-    dataset = GwDataset(source)
-    num_examples = len(dataset)
-    num_train_examples = int(num_examples * 0.8)
-    num_test_examples = num_examples - num_train_examples
-    train_dataset, test_dataset = random_split(dataset, [num_train_examples, num_test_examples])
-
-    manager.train(train_dataset, test_dataset, device)
+    manager.train(source, device)
 
 
 def existing_dir_path(s: str) -> Path:
