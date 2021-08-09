@@ -48,8 +48,10 @@ class GwDataset(Dataset):
 
         return x, y
 
-def gw_train_and_test_datasets(source: Path, transform: Optional[Callable]):
-    dataset = GwDataset(source, transform=transform)
+def gw_train_and_test_datasets(source: Path,
+                               transform: Optional[Callable],
+                               target_transform: Optional[Callable]):
+    dataset = GwDataset(source, transform=transform, target_transform=target_transform)
     num_examples = len(dataset)
     num_train_examples = int(num_examples * 0.8)
     num_test_examples = num_examples - num_train_examples

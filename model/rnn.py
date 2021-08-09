@@ -74,10 +74,13 @@ class RnnManager(ModelManager):
 
         hp = RnnHyperParameters()
 
-        def transform(x: np.ndarray):
+        def transform(x: np.ndarray) -> torch.Tensor:
             return torch.tensor(x, dtype=hp.dtype, device=device)
 
-        train_dataset, test_dataset = gw_train_and_test_datasets(source, transform)
+        def target_transform(y: int) -> torch.Tensor:
+            return torch.tensor(y, dtype=torch.long, device=device)
+
+        train_dataset, test_dataset = gw_train_and_test_datasets(source, transform, target_transform)
 
         model = Rnn(hp, device=device)
         model.to(device, dtype=hp.dtype)
