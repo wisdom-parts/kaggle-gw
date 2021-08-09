@@ -34,7 +34,7 @@ class GwDataset(Dataset):
     def __len__(self):
         return len(self.ids)
 
-    def __getitem__(self, idx: int) -> Tuple[Tensor, int]:
+    def __getitem__(self, idx: int) -> Tuple[Tensor, Tensor]:
         _id = self.ids[idx]
         fpath = str(train_file(self.source, _id))
 
