@@ -39,7 +39,6 @@ def process_sig(sig: np.ndarray) -> np.ndarray:
     high = pycbc.filter.highpass(windowed, 15, 8)
 
     # whiten
-
     psd = interpolate(welch(high), 1.0 / high.duration)
     white = (high.to_frequencyseries() / psd ** 0.5).to_timeseries()
 

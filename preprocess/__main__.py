@@ -1,15 +1,12 @@
 import argparse
-from string import hexdigits
-
-import numpy as np
-import os
-from pathlib import Path
 import shutil
+from string import hexdigits
 from typing import Callable, Mapping
 
-from preprocess import filter_sig
-from gw_util import *
+import numpy as np
 
+from gw_util import *
+from preprocess import filter_sig
 
 ProcessFunction = Callable[[np.ndarray], np.ndarray]
 
