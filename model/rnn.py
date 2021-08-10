@@ -14,11 +14,12 @@ from model import ModelManager, gw_train_and_test_datasets
 class RnnType(Enum):
     RNN = auto()
     LSTM = auto()
+    GRU = auto()
 
 
 @dataclass()
 class RnnHyperParameters:
-    rnn_type: RnnType = RnnType.RNN
+    rnn_type: RnnType = RnnType.GRU
     hidden_dim: int = 31
     n_layers: int = 3
     n_epochs: int = 20
@@ -45,9 +46,12 @@ class Rnn(nn.Module):
         if hp.rnn_type == RnnType.RNN:
             self.rnn = nn.RNN(N_SIGNALS, hp.hidden_dim, hp.n_layers,
                               batch_first=True, bidirectional=self.hp.bidirectional)
-        else:
+        elif hp.rnn_type == RnnType.LSTM:
             self.rnn = nn.LSTM(N_SIGNALS, hp.hidden_dim, hp.n_layers,
                                batch_first=True, bidirectional=self.hp.bidirectional)
+        elif hp.rnn_type == RnnType.GRU:
+            self.rnn = nn.GRU(N_SIGNALS, hp.hidden_dim, hp.n_layers,
+                              batch_first=True, bidirectional=self.hp.bidirectional)
 
         # convolution from the RNN's output at each point in the sequence to logits for target= 0 versus 1
         # noinspection PyTypeChecker
@@ -59,7 +63,7 @@ class Rnn(nn.Module):
         batch_size = x.size()[0]
         assert x.size() == (batch_size, N_SIGNALS, SIGNAL_LEN)
 
-        out, _ = self.rnn(torch.transpose(x, 1, 2), self.initial_hidden(batch_size))
+        out, _ = self.rnn(torch.transpose(x, 1, 2))
         assert out.size() == (batch_size, SIGNAL_LEN, self.rnn_out_channels)
 
         out = self.conv(torch.transpose(out, 1, 2))
@@ -69,14 +73,6 @@ class Rnn(nn.Module):
         assert out.size() == (batch_size, 2)
 
         return out
-
-    def initial_hidden(self, batch_size: int) -> Tensor:
-        return torch.zeros(self.num_directions * self.hp.n_layers,
-                           batch_size,
-                           self.hp.hidden_dim,
-                           device=self.device,
-                           dtype=self.hp.dtype)
-
 
 class RnnManager(ModelManager):
     def train(self,
