@@ -1,10 +1,10 @@
 import numpy as np
-import scipy.signal
 import pycbc
 import pycbc.filter
+import scipy.signal
 from pycbc.types import TimeSeries
-from gw_util import DELTA_T, N_SIGNALS, SIGNAL_LEN
-from typing import List
+
+from gw_util import N_SIGNALS, SIGNAL_LEN, timeseries_from_signal
 
 # Given that the most visible signals I have looked at
 # (all of the signals?) show up in a t range of roughly (1.3, 1.8),
@@ -14,14 +14,6 @@ TUKEY_WINDOW = scipy.signal.windows.tukey(4096, alpha=0.2)
 
 def window(sigs: np.ndarray) -> np.ndarray:
     return sigs * TUKEY_WINDOW
-
-
-def timeseries_from_signal(sig: np.ndarray) -> TimeSeries:
-    return TimeSeries(sig, epoch=0, delta_t=DELTA_T)
-
-
-def timeseries_from_signals(sigs: np.ndarray) -> List[TimeSeries]:
-    return [timeseries_from_signal(sigs[i]) for i in range(N_SIGNALS)]
 
 
 def bandpass_ts(ts: TimeSeries, lf: float = 35.0, hf: float = 350.0) -> TimeSeries:

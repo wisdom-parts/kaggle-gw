@@ -1,5 +1,9 @@
 import os
 from pathlib import Path
+from typing import List
+import numpy as np
+
+from pycbc.types import TimeSeries
 
 N_SIGNALS = 3
 SIGNAL_NAMES = ["LIGO Hanford", "LIGO Livingston", "Virgo"]
@@ -60,3 +64,10 @@ def validate_source_dir(source_dir: Path) -> bool:
         if not os.path.isfile(sample_submission_file(source_dir)):
             raise FileNotFoundError(f"missing {SAMPLE_SUBMISSION_FILENAME} in {source_dir}")
         return True
+
+def timeseries_from_signal(sig: np.ndarray) -> TimeSeries:
+    return TimeSeries(sig, epoch=0, delta_t=DELTA_T)
+
+
+def timeseries_from_signals(sigs: np.ndarray) -> List[TimeSeries]:
+    return [timeseries_from_signal(sigs[i]) for i in range(N_SIGNALS)]
