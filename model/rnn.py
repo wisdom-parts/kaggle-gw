@@ -57,7 +57,8 @@ class Rnn(nn.Module):
         # noinspection PyTypeChecker
         self.conv = nn.Conv1d(in_channels=self.rnn_out_channels,
                               out_channels=2,
-                              kernel_size=1)
+                              kernel_size=3, padding=1)
+        self.linear_end = nn.Linear(in_features=N_SIGNALS, out_features=2)
 
     def forward(self, x: Tensor) -> Tensor:
         batch_size = x.size()[0]
@@ -143,3 +144,4 @@ class RnnManager(ModelManager):
         test_loss /= num_batches
         correct /= num_examples
         print(f"----\ntest metrics: Accuracy: {(100 * correct):>0.1f}%, Avg loss: {test_loss:>8f} \n")
+
