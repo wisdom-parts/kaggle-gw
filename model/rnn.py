@@ -19,12 +19,12 @@ class RnnType(Enum):
 
 @dataclass()
 class RnnHyperParameters:
-    rnn_type: RnnType = RnnType.GRU
-    hidden_dim: int = 31
-    n_layers: int = 3
-    n_epochs: int = 20
-    lr: float = 0.01
-    bidirectional: bool = True
+    rnn_type: RnnType = RnnType.RNN
+    hidden_dim: int = 7
+    n_layers: int = 1
+    n_epochs: int = 100
+    lr: float = 0.005
+    bidirectional: bool = False
     dtype: torch.dtype = torch.float32
 
 
