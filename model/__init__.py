@@ -16,9 +16,12 @@ class GwDataset(Dataset):
     of size (N_SIGNALS, SIGNAL_LEN).
     """
 
-    def __init__(self, source: Path,
-                 transform: Optional[Callable] = None,
-                 target_transform: Optional[Callable] = None):
+    def __init__(
+        self,
+        source: Path,
+        transform: Optional[Callable] = None,
+        target_transform: Optional[Callable] = None,
+    ):
         self.source = source
         self.transform = transform
         self.target_transform = target_transform
@@ -48,18 +51,18 @@ class GwDataset(Dataset):
 
         return x, y
 
-def gw_train_and_test_datasets(source: Path,
-                               transform: Optional[Callable],
-                               target_transform: Optional[Callable]):
+
+def gw_train_and_test_datasets(
+    source: Path, transform: Optional[Callable], target_transform: Optional[Callable]
+):
     dataset = GwDataset(source, transform=transform, target_transform=target_transform)
     num_examples = len(dataset)
     num_train_examples = int(num_examples * 0.8)
     num_test_examples = num_examples - num_train_examples
     return random_split(dataset, [num_train_examples, num_test_examples])
 
+
 class ModelManager(ABC):
     @abstractmethod
-    def train(self,
-              source: Path,
-              device: torch.device):
+    def train(self, source: Path, device: torch.device):
         pass

@@ -43,21 +43,37 @@ class Rnn(nn.Module):
         self.num_directions = 2 if self.hp.bidirectional else 1
         self.rnn_out_channels = self.num_directions * self.hp.hidden_dim
 
+        self.rnn: nn.Module
         if hp.rnn_type == RnnType.RNN:
-            self.rnn = nn.RNN(N_SIGNALS, hp.hidden_dim, hp.n_layers,
-                              batch_first=True, bidirectional=self.hp.bidirectional)
+            self.rnn = nn.RNN(
+                N_SIGNALS,
+                hp.hidden_dim,
+                hp.n_layers,
+                batch_first=True,
+                bidirectional=self.hp.bidirectional,
+            )
         elif hp.rnn_type == RnnType.LSTM:
-            self.rnn = nn.LSTM(N_SIGNALS, hp.hidden_dim, hp.n_layers,
-                               batch_first=True, bidirectional=self.hp.bidirectional)
+            self.rnn = nn.LSTM(
+                N_SIGNALS,
+                hp.hidden_dim,
+                hp.n_layers,
+                batch_first=True,
+                bidirectional=self.hp.bidirectional,
+            )
         elif hp.rnn_type == RnnType.GRU:
-            self.rnn = nn.GRU(N_SIGNALS, hp.hidden_dim, hp.n_layers,
-                              batch_first=True, bidirectional=self.hp.bidirectional)
+            self.rnn = nn.GRU(
+                N_SIGNALS,
+                hp.hidden_dim,
+                hp.n_layers,
+                batch_first=True,
+                bidirectional=self.hp.bidirectional,
+            )
 
         # convolution from the RNN's output at each point in the sequence to logits for target= 0 versus 1
         # noinspection PyTypeChecker
-        self.conv = nn.Conv1d(in_channels=self.rnn_out_channels,
-                              out_channels=2,
-                              kernel_size=1)
+        self.conv = nn.Conv1d(
+            in_channels=self.rnn_out_channels, out_channels=2, kernel_size=1
+        )
 
     def forward(self, x: Tensor) -> Tensor:
         batch_size = x.size()[0]
@@ -74,10 +90,9 @@ class Rnn(nn.Module):
 
         return out
 
+
 class RnnManager(ModelManager):
-    def train(self,
-              source: Path,
-              device: torch.device):
+    def train(self, source: Path, device: torch.device):
 
         hp = RnnHyperParameters()
 
@@ -87,7 +102,9 @@ class RnnManager(ModelManager):
         def target_transform(y: int) -> torch.Tensor:
             return torch.tensor(y, dtype=torch.long, device=device)
 
-        train_dataset, test_dataset = gw_train_and_test_datasets(source, transform, target_transform)
+        train_dataset, test_dataset = gw_train_and_test_datasets(
+            source, transform, target_transform
+        )
 
         model = Rnn(hp, device=device)
         model.to(device, dtype=hp.dtype)
@@ -107,9 +124,13 @@ class RnnManager(ModelManager):
         print("Done!")
 
     @staticmethod
-    def train_epoch(model: Rnn, loss_fn: Callable[[Tensor, Tensor], Tensor],
-                    dataloader: DataLoader, num_examples: int,
-                    hp: RnnHyperParameters):
+    def train_epoch(
+        model: Rnn,
+        loss_fn: Callable[[Tensor, Tensor], Tensor],
+        dataloader: DataLoader,
+        num_examples: int,
+        hp: RnnHyperParameters,
+    ):
         optimizer = torch.optim.Adam(model.parameters(), lr=hp.lr)
 
         for batch_num, (X, y) in enumerate(dataloader):
@@ -128,8 +149,12 @@ class RnnManager(ModelManager):
                 print(f"training loss: {loss_val:>7f}  [{i:>5d}/{num_examples:>5d}]")
 
     @staticmethod
-    def test(model: Rnn, loss_fn: Callable[[Tensor, Tensor], Tensor],
-             dataloader: DataLoader, num_examples: int):
+    def test(
+        model: Rnn,
+        loss_fn: Callable[[Tensor, Tensor], Tensor],
+        dataloader: DataLoader,
+        num_examples: int,
+    ):
         num_batches = len(dataloader)
         test_loss = 0.0
         correct = 0.0
@@ -142,4 +167,6 @@ class RnnManager(ModelManager):
 
         test_loss /= num_batches
         correct /= num_examples
-        print(f"----\ntest metrics: Accuracy: {(100 * correct):>0.1f}%, Avg loss: {test_loss:>8f} \n")
+        print(
+            f"----\ntest metrics: Accuracy: {(100 * correct):>0.1f}%, Avg loss: {test_loss:>8f} \n"
+        )

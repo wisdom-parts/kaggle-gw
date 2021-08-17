@@ -1,11 +1,9 @@
 import argparse
 import shutil
-from string import hexdigits
 from typing import Callable, Mapping
 
-import numpy as np
-
 from gw_util import *
+from gw_util import make_data_dirs
 from preprocess import filter_sig
 
 ProcessFunction = Callable[[np.ndarray], np.ndarray]
@@ -13,23 +11,13 @@ ProcessFunction = Callable[[np.ndarray], np.ndarray]
 processors: Mapping[str, ProcessFunction] = {"filter_sig": filter_sig.process}
 
 
-def existing_dir_path(s: str) -> Path:
-    if os.path.isdir(s):
-        return Path(s)
-    else:
-        raise NotADirectoryError(s)
-
-
 def preprocess_train_or_test(
     processor: ProcessFunction, ids_file: Path, source: Path, dest: Path
 ):
-    hex_low = hexdigits[0:16]
-    for i in hex_low:
-        for j in hex_low:
-            for k in hex_low:
-                (dest / i / j / k).mkdir(parents=True)
     print("======================")
     print(f"Preprocessing {source} -> {dest}")
+
+    make_data_dirs(dest)
 
     count = 0
     with open(ids_file) as id_rows:
@@ -87,7 +75,7 @@ if __name__ == "__main__":
     arg_parser.add_argument(
         "source",
         help="directory containing the input dataset, in the original g2net directory structure",
-        type=existing_dir_path,
+        type=path_to_dir,
     )
     arg_parser.add_argument(
         "dest",

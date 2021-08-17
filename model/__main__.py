@@ -21,20 +21,13 @@ def train_model(manager: ModelManager, source: Path):
     manager.train(source, device)
 
 
-def existing_dir_path(s: str) -> Path:
-    if os.path.isdir(s):
-        return Path(s)
-    else:
-        raise NotADirectoryError(s)
-
-
 if __name__ == "__main__":
     arg_parser = argparse.ArgumentParser()
     arg_parser.add_argument("model", help="which model to train", choices=models.keys())
     arg_parser.add_argument(
         "source",
         help="directory containing the input dataset, in the original g2net directory structure",
-        type=existing_dir_path,
+        type=path_to_dir,
     )
     args = arg_parser.parse_args()
     model_class = models[args.model]

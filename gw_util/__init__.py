@@ -1,5 +1,7 @@
 import os
+import random
 from pathlib import Path
+from string import hexdigits
 from typing import List
 import numpy as np
 
@@ -16,6 +18,13 @@ SAMPLE_SUBMISSION_FILENAME = "sample_submission.csv"
 TRAINING_LABELS_FILENAME = "training_labels.csv"
 TRAIN_DIRNAME = "train"
 TEST_DIRNAME = "test"
+EXAMPLE_ID_LEN = 10
+
+hex_low = hexdigits[0:16]
+
+
+def random_example_id() -> str:
+    return "".join([random.choice(hex_low) for _ in range(EXAMPLE_ID_LEN)])
 
 
 def sample_submission_file(data_dir: Path) -> Path:
@@ -31,6 +40,10 @@ def train_dir(data_dir: Path) -> Path:
 
 
 def relative_example_path(example_id: str):
+    """
+    Returns the relative path from a train or test directory to the data file for the
+    given example_id.
+    """
     return Path(example_id[0]) / example_id[1] / example_id[2] / (example_id + ".npy")
 
 
@@ -62,8 +75,11 @@ def validate_source_dir(source_dir: Path) -> bool:
         return False
     else:
         if not os.path.isfile(sample_submission_file(source_dir)):
-            raise FileNotFoundError(f"missing {SAMPLE_SUBMISSION_FILENAME} in {source_dir}")
+            raise FileNotFoundError(
+                f"missing {SAMPLE_SUBMISSION_FILENAME} in {source_dir}"
+            )
         return True
+
 
 def timeseries_from_signal(sig: np.ndarray) -> TimeSeries:
     return TimeSeries(sig, epoch=0, delta_t=DELTA_T)
@@ -71,3 +87,25 @@ def timeseries_from_signal(sig: np.ndarray) -> TimeSeries:
 
 def timeseries_from_signals(sigs: np.ndarray) -> List[TimeSeries]:
     return [timeseries_from_signal(sigs[i]) for i in range(N_SIGNALS)]
+
+
+def make_data_dirs(train_or_test_dir: Path):
+    for i in hex_low:
+        for j in hex_low:
+            for k in hex_low:
+                (train_or_test_dir / i / j / k).mkdir(parents=True)
+
+
+def path_that_does_not_exist(s: str) -> Path:
+    path = Path(s)
+    if path.exists():
+        raise FileExistsError
+    else:
+        return path
+
+
+def path_to_dir(s: str) -> Path:
+    if os.path.isdir(s):
+        return Path(s)
+    else:
+        raise NotADirectoryError(s)
