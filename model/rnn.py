@@ -180,3 +180,4 @@ class RnnManager(ModelManager):
         test_loss /= num_batches
         correct /= num_examples
         print(f"----\ntest metrics: Accuracy: {(100 * correct):>0.1f}%, Avg loss: {test_loss:>8f} \n")
+
