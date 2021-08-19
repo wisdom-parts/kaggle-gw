@@ -43,34 +43,71 @@ class Rnn(nn.Module):
         self.num_directions = 2 if self.hp.bidirectional else 1
         self.rnn_out_channels = self.num_directions * self.hp.hidden_dim
 
-        if hp.rnn_type == RnnType.RNN:
-            self.rnn = nn.RNN(N_SIGNALS, hp.hidden_dim, hp.n_layers,
-                              batch_first=True, bidirectional=self.hp.bidirectional)
-        elif hp.rnn_type == RnnType.LSTM:
-            self.rnn = nn.LSTM(N_SIGNALS, hp.hidden_dim, hp.n_layers,
-                               batch_first=True, bidirectional=self.hp.bidirectional)
-        elif hp.rnn_type == RnnType.GRU:
-            self.rnn = nn.GRU(N_SIGNALS, hp.hidden_dim, hp.n_layers,
-                              batch_first=True, bidirectional=self.hp.bidirectional)
+        # if hp.rnn_type == RnnType.RNN:
+        #     self.rnn = nn.RNN(N_SIGNALS, hp.hidden_dim, hp.n_layers,
+        #                       batch_first=True, bidirectional=self.hp.bidirectional)
+        # elif hp.rnn_type == RnnType.LSTM:
+        #     self.rnn = nn.LSTM(N_SIGNALS, hp.hidden_dim, hp.n_layers,
+        #                        batch_first=True, bidirectional=self.hp.bidirectional)
+        # elif hp.rnn_type == RnnType.GRU:
+        #     self.rnn = nn.GRU(N_SIGNALS, hp.hidden_dim, hp.n_layers,
+        #                       batch_first=True, bidirectional=self.hp.bidirectional)
 
+        self.cnn_layer = nn.Sequential(
+            nn.Conv1d(in_channels=3, out_channels=16, kernel_size=3, padding=1),
+            nn.ReLU(),
+            nn.MaxPool1d(2),
+            nn.Conv1d(in_channels=16, out_channels=32, kernel_size=3, padding=1),
+            nn.ReLU(),
+            nn.MaxPool1d(2),
+            nn.Conv1d(in_channels=32, out_channels=64, kernel_size=3, padding=1),
+            nn.ReLU(),
+            nn.MaxPool1d(2),
+            nn.Conv1d(in_channels=64, out_channels=128, kernel_size=3, padding=1),
+            nn.ReLU(),
+            nn.MaxPool1d(2),
+            nn.Conv1d(in_channels=128, out_channels=256, kernel_size=3, padding=1),
+            nn.ReLU(),
+            nn.MaxPool1d(2),
+            nn.Conv1d(in_channels=256, out_channels=512, kernel_size=3, padding=1),
+            nn.ReLU(),
+            nn.MaxPool1d(2),
+            nn.Conv1d(in_channels=512, out_channels=512, kernel_size=3, padding=1),
+            nn.ReLU(),
+            nn.MaxPool1d(2),
+            nn.Conv1d(in_channels=512, out_channels=512, kernel_size=3, padding=1),
+            nn.ReLU(),
+            nn.MaxPool1d(2)
+        )
+        self.linear_layer = nn.Sequential(
+            nn.Linear(in_features=512, out_features=512),
+            nn.ReLU(),
+            nn.Dropout(p=0.5),
+            nn.Linear(in_features=512, out_features=2),
+            nn.Softmax(),
+            nn.Dropout(p=0.5),
+        )
         # convolution from the RNN's output at each point in the sequence to logits for target= 0 versus 1
         # noinspection PyTypeChecker
-        self.conv = nn.Conv1d(in_channels=self.rnn_out_channels,
-                              out_channels=2,
-                              kernel_size=1)
+        # self.conv = nn.Conv1d(in_channels=self.rnn_out_channels,
+        #                       out_channels=2,
+        #                       kernel_size=1)
 
     def forward(self, x: Tensor) -> Tensor:
         batch_size = x.size()[0]
         assert x.size() == (batch_size, N_SIGNALS, SIGNAL_LEN)
 
-        out, _ = self.rnn(torch.transpose(x, 1, 2))
-        assert out.size() == (batch_size, SIGNAL_LEN, self.rnn_out_channels)
-
-        out = self.conv(torch.transpose(out, 1, 2))
-        assert out.size() == (batch_size, 2, SIGNAL_LEN)
+        # out, _ = self.rnn(torch.transpose(x, 1, 2))
+        # assert out.size() == (batch_size, SIGNAL_LEN, self.rnn_out_channels)
+        #
+        # out = self.conv(torch.transpose(out, 1, 2))
+        # assert out.size() == (batch_size, 2, SIGNAL_LEN)
+        out = self.cnn_layer(x)
 
         out = torch.mean(out, dim=2)
-        assert out.size() == (batch_size, 2)
+        assert out.size() == (batch_size, 512)
+
+        out = self.linear_layer(out)
 
         return out
 
