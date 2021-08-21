@@ -13,9 +13,7 @@ from testdata import nearby_ones
 
 TestDataGenerator = Callable[[float], Tuple[np.ndarray, bool]]
 
-generators: Mapping[str, TestDataGenerator] = {
-    'nearby_ones': nearby_ones.generator
-}
+generators: Mapping[str, TestDataGenerator] = {"nearby_ones": nearby_ones.generator}
 
 CALIBRATION_SAMPLE_SIZE = 40
 

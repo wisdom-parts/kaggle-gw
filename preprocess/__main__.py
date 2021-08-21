@@ -1,7 +1,9 @@
 import argparse
+import collections
 import shutil
 import datetime
-from typing import Callable, Mapping
+from typing import Callable, Mapping, Optional, Set
+import random
 
 from gw_util import *
 from gw_util import make_data_dirs
@@ -16,63 +18,84 @@ processors: Mapping[str, ProcessFunction] = {
 
 
 def preprocess_train_or_test(
-    processor: ProcessFunction, ids_file: Path, source: Path, dest: Path
+    processor: ProcessFunction, source: Path, dest: Path, ids_to_process: Set[str]
 ):
     print("======================")
     print(f"Preprocessing {source} -> {dest}")
 
     make_data_dirs(dest)
 
-    count = 0
-    with open(ids_file) as id_rows:
-        for row in id_rows:
-            count += 1
-    print(f"{count} rows to process")
+    print(f"{len(ids_to_process)} rows to process")
 
-    with open(ids_file) as id_rows:
-        count = 0
-        skipped_header = False
-        for row in id_rows:
-            if not skipped_header:
-                skipped_header = True
-            else:
-                example_id = row.split(",")[0]
-                example_path = relative_example_path(example_id)
-                x = np.load(str(source / example_path))
-                np.save(str(dest / example_path), processor(x))
-            count += 1
-            if count % 100 == 0:
-                print(f"{datetime.datetime.now()}: processed {count} rows")
+    count = 0
+    for example_id in ids_to_process:
+        example_path = relative_example_path(example_id)
+        x = np.load(str(source / example_path))
+        np.save(str(dest / example_path), processor(x))
+        count += 1
+        if count % 100 == 0:
+            print(f"{datetime.datetime.now()}: processed {count} rows")
 
     print("Done!")
 
 
-def preprocess(processor: ProcessFunction, source: Path, dest: Path):
+def preprocess(
+    processor: ProcessFunction,
+    source: Path,
+    dest: Path,
+    num_train_examples: Optional[int],
+):
     has_test_data = validate_source_dir(source)
 
     os.makedirs(dest, exist_ok=True)
 
-    shutil.copy(training_labels_file(source), training_labels_file(dest))
+    all_ids: List[str] = []
+
+    with open(training_labels_file(source)) as training_labels_in:
+        for line in training_labels_in:
+            example_id = line.split(",")[0]
+            if example_id != "id":
+                all_ids.append(example_id)
+
+    chosen_ids = set(
+        random.sample(all_ids, num_train_examples) if num_train_examples else all_ids
+    )
+
+    with open(training_labels_file(source)) as training_labels_in:
+        with open(training_labels_file(dest), "w") as training_labels_out:
+            for line in training_labels_in:
+                example_id = line.split(",")[0]
+                if example_id == "id" or example_id in chosen_ids:
+                    training_labels_out.write(line)
 
     preprocess_train_or_test(
         processor,
-        training_labels_file(source),
         source=train_dir(source),
         dest=train_dir(dest),
+        ids_to_process=chosen_ids,
     )
 
-    if has_test_data:
+    if has_test_data and not num_train_examples:
         shutil.copy(sample_submission_file(source), sample_submission_file(dest))
+
+        with open(sample_submission_file(source)) as sample_submission_in:
+            all_ids = list(sample_submission_in)
+
         preprocess_train_or_test(
             processor,
-            sample_submission_file(source),
             source=test_dir(source),
             dest=test_dir(dest),
+            ids_to_process=set(all_ids),
         )
 
 
 if __name__ == "__main__":
     arg_parser = argparse.ArgumentParser()
+    arg_parser.add_argument(
+        "-n",
+        help="number of training examples to preprocess (omits test examples)",
+        type=int,
+    )
     arg_parser.add_argument(
         "processor", help="which processor to run", choices=processors.keys()
     )
@@ -87,4 +110,4 @@ if __name__ == "__main__":
         type=Path,
     )
     args = arg_parser.parse_args()
-    preprocess(processors[args.processor], args.source, args.dest)
+    preprocess(processors[args.processor], args.source, args.dest, args.n)

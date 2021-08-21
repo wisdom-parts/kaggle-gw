@@ -112,10 +112,9 @@ def qtransform_sig(sig: np.ndarray) -> Tuple[np.ndarray, np.ndarray, np.ndarray]
 
     # As of this writing, the return type for qtransform is incorrectly declared. (or inferred?)
     # noinspection PyTypeChecker
-    result: Tuple[np.ndarray, np.ndarray, np.ndarray] = (
-        ts.qtransform(delta_t=0.02,
-                      frange=(30, 350),
-                      logfsteps=30))
+    result: Tuple[np.ndarray, np.ndarray, np.ndarray] = ts.qtransform(
+        delta_t=0.02, frange=(30, 350), logfsteps=30
+    )
     assert result[2].shape == QTRANSFORM_OUTPUT_SHAPE
     return result
 
