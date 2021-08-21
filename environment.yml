@@ -12,7 +12,6 @@ dependencies:
   - mypy
   - pandas
   - pre-commit
-  - pycbc
   - pytest
   - python
   - pytorch
@@ -20,3 +19,5 @@ dependencies:
   - torchaudio
   - torchvision
   - typeguard
+  - pip:
+    - pycbc
