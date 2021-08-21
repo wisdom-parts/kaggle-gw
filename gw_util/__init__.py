@@ -98,7 +98,7 @@ def window_sigs(sigs: np.ndarray) -> np.ndarray:
     return sigs * TUKEY_WINDOW
 
 
-QTRANSFORM_OUTPUT_SHAPE = (30, 100)
+QTRANSFORM_OUTPUT_SHAPE = (30, 128)
 
 
 def qtransform_sig(sig: np.ndarray) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
@@ -113,7 +113,7 @@ def qtransform_sig(sig: np.ndarray) -> Tuple[np.ndarray, np.ndarray, np.ndarray]
     # As of this writing, the return type for qtransform is incorrectly declared. (or inferred?)
     # noinspection PyTypeChecker
     result: Tuple[np.ndarray, np.ndarray, np.ndarray] = ts.qtransform(
-        delta_t=0.02, frange=(30, 350), logfsteps=30
+        delta_t=1.0/64, frange=(30, 350), logfsteps=30
     )
     assert result[2].shape == QTRANSFORM_OUTPUT_SHAPE
     return result
