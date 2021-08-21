@@ -2,8 +2,10 @@ import os
 import random
 from pathlib import Path
 from string import hexdigits
-from typing import List
+from typing import List, Tuple
+
 import numpy as np
+import scipy.signal
 
 from pycbc.types import TimeSeries
 
@@ -88,6 +90,28 @@ def timeseries_from_signal(sig: np.ndarray) -> TimeSeries:
 def timeseries_from_signals(sigs: np.ndarray) -> List[TimeSeries]:
     return [timeseries_from_signal(sigs[i]) for i in range(N_SIGNALS)]
 
+
+TUKEY_WINDOW = scipy.signal.tukey(4096, alpha=0.2)
+
+
+def window_sigs(sigs: np.ndarray) -> np.ndarray:
+    return sigs * TUKEY_WINDOW
+
+
+def qtransform_sig(sig: np.ndarray) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """
+    Performs a qtransform on sig, returning
+    * times (numpy.ndarray) – The time that the qtransform is sampled.
+    * freqs (numpy.ndarray) – The frequencies that the qtransform is sampled.
+    * qplane (numpy.ndarray (2d)) – The two dimensional interpolated qtransform of this time series.
+    """
+    ts = timeseries_from_signal(window_sigs(sig))
+
+    # As of this writing, the return type for qtransform is incorrectly declared.
+    # noinspection PyTypeChecker
+    return ts.qtransform(delta_t=0.02,
+                        frange=(30, 350),
+                        logfsteps=30)
 
 def make_data_dirs(train_or_test_dir: Path):
     for i in hex_low:
