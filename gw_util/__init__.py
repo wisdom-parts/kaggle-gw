@@ -98,6 +98,9 @@ def window_sigs(sigs: np.ndarray) -> np.ndarray:
     return sigs * TUKEY_WINDOW
 
 
+QTRANSFORM_OUTPUT_SHAPE = (30, 100)
+
+
 def qtransform_sig(sig: np.ndarray) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     """
     Performs a qtransform on sig, returning
@@ -107,11 +110,15 @@ def qtransform_sig(sig: np.ndarray) -> Tuple[np.ndarray, np.ndarray, np.ndarray]
     """
     ts = timeseries_from_signal(window_sigs(sig))
 
-    # As of this writing, the return type for qtransform is incorrectly declared.
+    # As of this writing, the return type for qtransform is incorrectly declared. (or inferred?)
     # noinspection PyTypeChecker
-    return ts.qtransform(delta_t=0.02,
-                        frange=(30, 350),
-                        logfsteps=30)
+    result: Tuple[np.ndarray, np.ndarray, np.ndarray] = (
+        ts.qtransform(delta_t=0.02,
+                      frange=(30, 350),
+                      logfsteps=30))
+    assert result[2].shape == QTRANSFORM_OUTPUT_SHAPE
+    return result
+
 
 def make_data_dirs(train_or_test_dir: Path):
     for i in hex_low:

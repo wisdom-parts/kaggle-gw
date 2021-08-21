@@ -1,14 +1,18 @@
 import argparse
 import shutil
+import datetime
 from typing import Callable, Mapping
 
 from gw_util import *
 from gw_util import make_data_dirs
-from preprocess import filter_sig
+from preprocess import filter_sig, qtransform
 
 ProcessFunction = Callable[[np.ndarray], np.ndarray]
 
-processors: Mapping[str, ProcessFunction] = {"filter_sig": filter_sig.process}
+processors: Mapping[str, ProcessFunction] = {
+    "filter_sig": filter_sig.process,
+    "qtransform": qtransform.process,
+}
 
 
 def preprocess_train_or_test(
@@ -37,8 +41,8 @@ def preprocess_train_or_test(
                 x = np.load(str(source / example_path))
                 np.save(str(dest / example_path), processor(x))
             count += 1
-            if count % 1000 == 0:
-                print(f"processed {count} rows")
+            if count % 100 == 0:
+                print(f"{datetime.datetime.now()}: processed {count} rows")
 
     print("Done!")
 
