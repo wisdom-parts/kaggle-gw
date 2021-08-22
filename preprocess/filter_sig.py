@@ -49,7 +49,9 @@ def process_sig(sig: np.ndarray) -> np.ndarray:
 
     preprocessed = np.array(bandpassed)
     # Normalize to [0, 1]
-    return preprocessed / np.max(np.abs(preprocessed))
+    result = preprocessed - preprocessed.min()
+    result = result / result.max()
+    return result
 
 
 def process(sigs: np.ndarray) -> np.ndarray:

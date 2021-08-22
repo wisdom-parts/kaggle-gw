@@ -49,13 +49,7 @@ def preprocess(
 
     os.makedirs(dest, exist_ok=True)
 
-    all_ids: List[str] = []
-
-    with open(training_labels_file(source)) as training_labels_in:
-        for line in training_labels_in:
-            example_id = line.split(",")[0]
-            if example_id != "id":
-                all_ids.append(example_id)
+    all_ids = read_first_column(training_labels_file(source))
 
     chosen_ids = set(
         random.sample(all_ids, num_train_examples) if num_train_examples else all_ids
@@ -77,16 +71,23 @@ def preprocess(
 
     if has_test_data and not num_train_examples:
         shutil.copy(sample_submission_file(source), sample_submission_file(dest))
-
-        with open(sample_submission_file(source)) as sample_submission_in:
-            all_ids = list(sample_submission_in)
-
+        all_ids = read_first_column(sample_submission_file(source))
         preprocess_train_or_test(
             processor,
             source=test_dir(source),
             dest=test_dir(dest),
             ids_to_process=set(all_ids),
         )
+
+
+def read_first_column(path: Path) -> List[str]:
+    vs: List[str] = []
+    with open(path) as file:
+        it = file
+        next(it, None) # skip header row
+        for line in it:
+            vs.append(line.split(",")[0])
+    return vs
 
 
 if __name__ == "__main__":
