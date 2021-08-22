@@ -5,6 +5,9 @@ from gw_util import N_SIGNALS, SIGNAL_LEN, qtransform_sig
 
 def process_sig(sig: np.ndarray) -> np.ndarray:
     _, _, result = qtransform_sig(sig)
+    # Normalize to (0.0 .. 1.0)
+    result = result - result.min()
+    result = result / result.max()
     return result
 
 
