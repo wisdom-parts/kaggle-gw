@@ -12,14 +12,14 @@ from model import ModelManager, gw_train_and_test_datasets
 
 @dataclass()
 class HyperParameters:
-    batch_size = 65
-    n_epochs = 100
-    lr = 0.005
-    dtype = torch.float32
-    conv1_out_channels = 2
-    conv2_width = 8
-    conv2_h_stride = 4
-    conv2_out_channels = 2
+    batch_size: int = 64
+    n_epochs: int = 100
+    lr: float = 0.005
+    dtype: torch.dtype = torch.float32
+    conv1_out_channels: int = 10
+    conv2_width: int = 8
+    conv2_h_stride: int = 4
+    conv2_out_channels: int = 10
 
 
 class Cnn(nn.Module):
