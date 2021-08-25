@@ -1,91 +1,78 @@
 from dataclasses import dataclass
-from enum import Enum, auto
 from typing import Callable
 
-import numpy as np
 import torch
 from torch import nn, Tensor
 from torch.utils.data import DataLoader
 
+import preprocess.qtransform as q
 from gw_util import *
 from model import ModelManager, gw_train_and_test_datasets
 
 
-class RnnType(Enum):
-    RNN = auto()
-    LSTM = auto()
-    GRU = auto()
-
-
 @dataclass()
-class RnnHyperParameters:
-    rnn_type: RnnType = RnnType.RNN
-    hidden_dim: int = 7
-    n_layers: int = 1
-    n_epochs: int = 100
-    lr: float = 0.005
-    bidirectional: bool = False
-    dtype: torch.dtype = torch.float32
+class HyperParameters:
+    batch_size = 65
+    n_epochs = 100
+    lr = 0.005
+    dtype = torch.float32
+    conv1_out_channels = 2
+    conv2_width = 8
+    conv2_h_stride = 4
+    conv2_out_channels = 2
 
 
-class Rnn(nn.Module):
+class Cnn(nn.Module):
     """
-    Applies an RNN to the input and produces two logits as output.
-
-    input size: (batch_size, N_SIGNALS, SIGNAL_LEN)
+    Applies a CNN to the output of preprocess qtransform and produces two logits as output.
+    input size: (batch_size, ) + preprocess.qtransform.OUTPUT_SHAPE
     output size: (batch_size, 2)
     """
 
-    def __init__(self, hp: RnnHyperParameters, device: torch.device):
+    def __init__(self, hp: HyperParameters, device: torch.device):
         super().__init__()
         self.hp = hp
         self.device = device
-        self.num_directions = 2 if self.hp.bidirectional else 1
-        self.rnn_out_channels = self.num_directions * self.hp.hidden_dim
 
-        self.rnn: nn.Module
-        if hp.rnn_type == RnnType.RNN:
-            self.rnn = nn.RNN(
-                N_SIGNALS,
-                hp.hidden_dim,
-                hp.n_layers,
-                batch_first=True,
-                bidirectional=self.hp.bidirectional,
-            )
-        elif hp.rnn_type == RnnType.LSTM:
-            self.rnn = nn.LSTM(
-                N_SIGNALS,
-                hp.hidden_dim,
-                hp.n_layers,
-                batch_first=True,
-                bidirectional=self.hp.bidirectional,
-            )
-        elif hp.rnn_type == RnnType.GRU:
-            self.rnn = nn.GRU(
-                N_SIGNALS,
-                hp.hidden_dim,
-                hp.n_layers,
-                batch_first=True,
-                bidirectional=self.hp.bidirectional,
-            )
-
-        # convolution from the RNN's output at each point in the sequence to logits for target= 0 versus 1
-        # noinspection PyTypeChecker
-        self.conv = nn.Conv1d(
-            in_channels=self.rnn_out_channels, out_channels=2, kernel_size=1
+        # An opportunity for the model to compare and contrast the three signals
+        # and find local patterns.
+        self.conv1 = nn.Conv2d(
+            in_channels=3,
+            out_channels=hp.conv1_out_channels,
+            kernel_size=(3, 3),
+            stride=(1, 1),
+            padding=(1, 1),
         )
+        # An opportunity to look for signal in vertical slices.
+        # We imagine that each frequency has a different meaning,
+        # hence we should work with vertical slices instead of patches.
+        self.conv2 = nn.Conv2d(
+            in_channels=hp.conv1_out_channels,
+            out_channels=hp.conv2_out_channels,
+            kernel_size=(q.FREQ_STEPS, hp.conv2_width),
+            stride=(q.FREQ_STEPS, hp.conv2_h_stride),
+        )
+        self.conv2_out_w = 1 + ((q.TIME_STEPS - hp.conv2_width) // hp.conv2_h_stride)
+        # We imagine that in this data (unlike real life) specific times
+        # in the 2-second interval have meaning, so we use a dense layer
+        # across time.
+        self.linear = nn.Linear(
+            in_features=hp.conv2_out_channels * self.conv2_out_w,
+            out_features=2
+        )
+        self.activation = nn.ReLU()
 
     def forward(self, x: Tensor) -> Tensor:
         batch_size = x.size()[0]
-        assert x.size() == (batch_size, N_SIGNALS, SIGNAL_LEN)
+        assert x.size()[1:] == q.OUTPUT_SHAPE
 
-        out, _ = self.rnn(torch.transpose(x, 1, 2))
-        assert out.size() == (batch_size, SIGNAL_LEN, self.rnn_out_channels)
+        out = self.activation(self.conv1(x))
+        assert out.size() == (batch_size, self.hp.conv1_out_channels, q.FREQ_STEPS, q.TIME_STEPS)
 
-        out = self.conv(torch.transpose(out, 1, 2))
-        assert out.size() == (batch_size, 2, SIGNAL_LEN)
+        out = self.activation(self.conv2(out))
+        assert out.size() == (batch_size, self.hp.conv2_out_channels, 1, self.conv2_out_w)
 
-        out = torch.mean(out, dim=2)
+        out = self.activation(self.linear(torch.flatten(out, start_dim=1)))
         assert out.size() == (batch_size, 2)
 
         return out
@@ -94,7 +81,7 @@ class Rnn(nn.Module):
 class Manager(ModelManager):
     def train(self, source: Path, device: torch.device):
 
-        hp = RnnHyperParameters()
+        hp = HyperParameters()
 
         def transform(x: np.ndarray) -> torch.Tensor:
             return torch.tensor(x, dtype=hp.dtype, device=device)
@@ -106,13 +93,13 @@ class Manager(ModelManager):
             source, transform, target_transform
         )
 
-        model = Rnn(hp, device=device)
+        model = Cnn(hp, device=device)
         model.to(device, dtype=hp.dtype)
 
         loss_fn = nn.CrossEntropyLoss()
 
-        train_dataloader = DataLoader(train_dataset, batch_size=64, shuffle=True)
-        test_dataloader = DataLoader(test_dataset, batch_size=64, shuffle=True)
+        train_dataloader = DataLoader(train_dataset, batch_size=hp.batch_size, shuffle=True)
+        test_dataloader = DataLoader(test_dataset, batch_size=hp.batch_size, shuffle=True)
 
         print(hp)
 
@@ -125,11 +112,11 @@ class Manager(ModelManager):
 
     @staticmethod
     def train_epoch(
-        model: Rnn,
+        model: Cnn,
         loss_fn: Callable[[Tensor, Tensor], Tensor],
         dataloader: DataLoader,
         num_examples: int,
-        hp: RnnHyperParameters,
+        hp: HyperParameters,
     ):
         optimizer = torch.optim.Adam(model.parameters(), lr=hp.lr)
 
@@ -150,7 +137,7 @@ class Manager(ModelManager):
 
     @staticmethod
     def test(
-        model: Rnn,
+        model: Cnn,
         loss_fn: Callable[[Tensor, Tensor], Tensor],
         dataloader: DataLoader,
         num_examples: int,

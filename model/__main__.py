@@ -7,8 +7,12 @@ from gw_util import *
 from gw_util import validate_source_dir
 from model import ModelManager
 from model import rnn
+from model import cnn_dean
 
-models: Mapping[str, Type[ModelManager]] = {"rnn": rnn.RnnManager}
+models: Mapping[str, Type[ModelManager]] = {
+    "rnn": rnn.Manager,
+    "cnn_dean": cnn_dean.Manager,
+}
 
 
 def train_model(manager: ModelManager, source: Path):

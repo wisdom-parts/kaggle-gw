@@ -12,8 +12,8 @@ from pycbc.types import TimeSeries
 N_SIGNALS = 3
 SIGNAL_NAMES = ["LIGO Hanford", "LIGO Livingston", "Virgo"]
 SIGNAL_LEN = 4096
-SIGNAL_SECONDS = 2.0
-DELTA_T = SIGNAL_SECONDS / SIGNAL_LEN
+SIGNAL_SECS = 2.0
+DELTA_T = SIGNAL_SECS / SIGNAL_LEN
 SIGNAL_TIMES = [i * DELTA_T for i in range(SIGNAL_LEN)]
 
 SAMPLE_SUBMISSION_FILENAME = "sample_submission.csv"
@@ -97,26 +97,6 @@ TUKEY_WINDOW = scipy.signal.tukey(4096, alpha=0.2)
 def window_sigs(sigs: np.ndarray) -> np.ndarray:
     return sigs * TUKEY_WINDOW
 
-
-QTRANSFORM_OUTPUT_SHAPE = (30, 128)
-
-
-def qtransform_sig(sig: np.ndarray) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """
-    Performs a qtransform on sig, returning
-    * times (numpy.ndarray) – The time that the qtransform is sampled.
-    * freqs (numpy.ndarray) – The frequencies that the qtransform is sampled.
-    * qplane (numpy.ndarray (2d)) – The two dimensional interpolated qtransform of this time series.
-    """
-    ts = timeseries_from_signal(window_sigs(sig))
-
-    # As of this writing, the return type for qtransform is incorrectly declared. (or inferred?)
-    # noinspection PyTypeChecker
-    result: Tuple[np.ndarray, np.ndarray, np.ndarray] = ts.qtransform(
-        delta_t=1.0/64, frange=(30, 350), logfsteps=30
-    )
-    assert result[2].shape == QTRANSFORM_OUTPUT_SHAPE
-    return result
 
 
 def make_data_dirs(train_or_test_dir: Path):
