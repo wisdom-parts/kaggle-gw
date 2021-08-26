@@ -2,7 +2,13 @@ from typing import Tuple
 
 import numpy as np
 
-from gw_util import N_SIGNALS, SIGNAL_LEN, SIGNAL_SECS, timeseries_from_signal, window_sigs
+from gw_util import (
+    N_SIGNALS,
+    SIGNAL_LEN,
+    SIGNAL_SECS,
+    timeseries_from_signal,
+    window_sigs,
+)
 
 FREQ_STEPS = 30
 
@@ -24,10 +30,11 @@ def qtransform_sig(sig: np.ndarray) -> Tuple[np.ndarray, np.ndarray, np.ndarray]
     # As of this writing, the return type for qtransform is incorrectly declared. (or inferred?)
     # noinspection PyTypeChecker
     result: Tuple[np.ndarray, np.ndarray, np.ndarray] = ts.qtransform(
-        delta_t=1.0/TIME_STEPS_PER_SEC, frange=(30, 350), logfsteps=FREQ_STEPS
+        delta_t=1.0 / TIME_STEPS_PER_SEC, frange=(30, 350), logfsteps=FREQ_STEPS
     )
     assert result[2].shape == OUTPUT_SHAPE
     return result
+
 
 def process_sig(sig: np.ndarray) -> np.ndarray:
     _, _, result = qtransform_sig(sig)

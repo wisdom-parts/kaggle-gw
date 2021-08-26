@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from typing import Callable
 
 import torch
+import wandb
 from torch import nn, Tensor
 from torch.utils.data import DataLoader
 
@@ -57,8 +58,7 @@ class Cnn(nn.Module):
         # in the 2-second interval have meaning, so we use a dense layer
         # across time.
         self.linear = nn.Linear(
-            in_features=hp.conv2_out_channels * self.conv2_out_w,
-            out_features=2
+            in_features=hp.conv2_out_channels * self.conv2_out_w, out_features=2
         )
         self.activation = nn.ReLU()
 
@@ -67,10 +67,20 @@ class Cnn(nn.Module):
         assert x.size()[1:] == q.OUTPUT_SHAPE
 
         out = self.activation(self.conv1(x))
-        assert out.size() == (batch_size, self.hp.conv1_out_channels, q.FREQ_STEPS, q.TIME_STEPS)
+        assert out.size() == (
+            batch_size,
+            self.hp.conv1_out_channels,
+            q.FREQ_STEPS,
+            q.TIME_STEPS,
+        )
 
         out = self.activation(self.conv2(out))
-        assert out.size() == (batch_size, self.hp.conv2_out_channels, 1, self.conv2_out_w)
+        assert out.size() == (
+            batch_size,
+            self.hp.conv2_out_channels,
+            1,
+            self.conv2_out_w,
+        )
 
         out = self.activation(self.linear(torch.flatten(out, start_dim=1)))
         assert out.size() == (batch_size, 2)
@@ -96,10 +106,16 @@ class Manager(ModelManager):
         model = Cnn(hp, device=device)
         model.to(device, dtype=hp.dtype)
 
+        wandb.watch(model, log_freq=100)
+
         loss_fn = nn.CrossEntropyLoss()
 
-        train_dataloader = DataLoader(train_dataset, batch_size=hp.batch_size, shuffle=True)
-        test_dataloader = DataLoader(test_dataset, batch_size=hp.batch_size, shuffle=True)
+        train_dataloader = DataLoader(
+            train_dataset, batch_size=hp.batch_size, shuffle=True
+        )
+        test_dataloader = DataLoader(
+            test_dataset, batch_size=hp.batch_size, shuffle=True
+        )
 
         print(hp)
 
@@ -134,6 +150,7 @@ class Manager(ModelManager):
                 loss_val = loss.item()
                 i = batch_num * len(X)
                 print(f"training loss: {loss_val:>7f}  [{i:>5d}/{num_examples:>5d}]")
+                wandb.log({"loss": loss_val})
 
     @staticmethod
     def test(

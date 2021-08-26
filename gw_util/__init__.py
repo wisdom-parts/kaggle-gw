@@ -98,7 +98,6 @@ def window_sigs(sigs: np.ndarray) -> np.ndarray:
     return sigs * TUKEY_WINDOW
 
 
-
 def make_data_dirs(train_or_test_dir: Path):
     for i in hex_low:
         for j in hex_low:

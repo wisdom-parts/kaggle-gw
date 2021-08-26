@@ -2,6 +2,7 @@ import argparse
 from typing import Type, Mapping
 
 import torch
+import wandb
 
 from gw_util import *
 from gw_util import validate_source_dir
@@ -34,6 +35,9 @@ if __name__ == "__main__":
         type=path_to_dir,
     )
     args = arg_parser.parse_args()
+
+    wandb.init(project="g2net-" + args.model)
+
     model_class = models[args.model]
     model = model_class()
     train_model(model, args.source)

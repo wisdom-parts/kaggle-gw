@@ -84,7 +84,7 @@ def read_first_column(path: Path) -> List[str]:
     vs: List[str] = []
     with open(path) as file:
         it = file
-        next(it, None) # skip header row
+        next(it, None)  # skip header row
         for line in it:
             vs.append(line.split(",")[0])
     return vs
