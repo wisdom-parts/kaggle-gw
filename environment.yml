@@ -20,5 +20,6 @@ dependencies:
   - torchvision
   - typeguard
   - wandb
+  - pip
   - pip:
     - pycbc
