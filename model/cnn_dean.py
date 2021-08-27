@@ -14,8 +14,8 @@ from model import ModelManager, gw_train_and_test_datasets
 @dataclass()
 class HyperParameters:
     batch_size: int = 64
-    n_epochs: int = 100
-    lr: float = 0.005
+    n_epochs: int = 1000
+    lr: float = 0.0001
     dtype: torch.dtype = torch.float32
 
     conv1a_out_channels: int = 3
@@ -153,7 +153,7 @@ class Manager(ModelManager):
 
         loss_fn = nn.CrossEntropyLoss()
 
-        wandb.watch(model, criterion=loss_fn, log="all", log_freq=10)
+        wandb.watch(model, criterion=loss_fn, log="all", log_freq=1)
 
         train_dataloader = DataLoader(
             train_dataset, batch_size=hp.batch_size, shuffle=True
@@ -191,7 +191,7 @@ class Manager(ModelManager):
             loss = loss_fn(pred, y)
             loss.backward()
             optimizer.step()
-            wandb.log({"loss": loss.item()})
+            wandb.log({"pred": pred.detach().cpu().numpy(), "loss": loss.item()})
 
             if batch_num % 100 == 0:
                 i = batch_num * len(X)
