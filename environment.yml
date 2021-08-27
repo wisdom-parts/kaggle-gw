@@ -19,7 +19,7 @@ dependencies:
   - torchaudio
   - torchvision
   - typeguard
-  - wandb
   - pip
   - pip:
     - pycbc
+    - wandb
