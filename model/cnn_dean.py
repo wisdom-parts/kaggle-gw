@@ -17,10 +17,17 @@ class HyperParameters:
     n_epochs: int = 100
     lr: float = 0.005
     dtype: torch.dtype = torch.float32
-    conv1_out_channels: int = 10
-    conv2_width: int = 8
-    conv2_h_stride: int = 4
-    conv2_out_channels: int = 10
+
+    conv1a_out_channels: int = 3
+    conv1b_out_channels: int = 5
+    mp1_h: int = 2
+    mp1_w: int = 2
+
+    conv2_h: int = 5  # must be odd
+    conv2_w: int = 5  # must be odd
+    conv2_out_channels: int = 5
+    mp2_h: int = 3
+    mp2_w: int = 4
 
 
 class Cnn(nn.Module):
@@ -35,30 +42,44 @@ class Cnn(nn.Module):
         self.hp = hp
         self.device = device
 
-        # An opportunity for the model to compare and contrast the three signals
-        # and find local patterns.
-        self.conv1 = nn.Conv2d(
+        self.conv1a = nn.Conv2d(
             in_channels=3,
-            out_channels=hp.conv1_out_channels,
+            out_channels=hp.conv1a_out_channels,
             kernel_size=(3, 3),
             stride=(1, 1),
             padding=(1, 1),
         )
-        # An opportunity to look for signal in vertical slices.
-        # We imagine that each frequency has a different meaning,
-        # hence we should work with vertical slices instead of patches.
-        self.conv2 = nn.Conv2d(
-            in_channels=hp.conv1_out_channels,
-            out_channels=hp.conv2_out_channels,
-            kernel_size=(q.FREQ_STEPS, hp.conv2_width),
-            stride=(q.FREQ_STEPS, hp.conv2_h_stride),
+        self.conv1b = nn.Conv2d(
+            in_channels=hp.conv1a_out_channels,
+            out_channels=hp.conv1b_out_channels,
+            kernel_size=(3, 3),
+            stride=(1, 1),
+            padding=(1, 1),
         )
-        self.conv2_out_w = 1 + ((q.TIME_STEPS - hp.conv2_width) // hp.conv2_h_stride)
-        # We imagine that in this data (unlike real life) specific times
-        # in the 2-second interval have meaning, so we use a dense layer
-        # across time.
+        self.mp1 = nn.MaxPool2d(
+            kernel_size=(hp.mp1_h, hp.mp1_w),
+        )
+        self.conv2 = nn.Conv2d(
+            in_channels=hp.conv1b_out_channels,
+            out_channels=hp.conv2_out_channels,
+            kernel_size=(hp.conv2_h, hp.conv2_w),
+            stride=(1, 1),
+            padding=(hp.conv2_h // 2, hp.conv2_w // 2)
+        )
+        self.mp2 = nn.MaxPool2d(
+            kernel_size=(hp.mp2_h, hp.mp2_w),
+        )
+
+        # Do the size math here, to find out the number of input features for the linear layer.
+        self.mp1_out_h = q.FREQ_STEPS // self.hp.mp1_h
+        self.mp1_out_w = q.TIME_STEPS // self.hp.mp1_w
+
+        self.mp2_out_h = self.mp1_out_h // self.hp.mp2_h
+        self.mp2_out_w = self.mp1_out_w // self.hp.mp2_w
+
         self.linear = nn.Linear(
-            in_features=hp.conv2_out_channels * self.conv2_out_w, out_features=2
+            in_features=hp.conv2_out_channels * self.mp2_out_h * self.mp2_out_w,
+            out_features=2,
         )
         self.activation = nn.ReLU()
 
@@ -66,20 +87,44 @@ class Cnn(nn.Module):
         batch_size = x.size()[0]
         assert x.size()[1:] == q.OUTPUT_SHAPE
 
-        out = self.activation(self.conv1(x))
+        out = self.activation(self.conv1a(x))
         assert out.size() == (
             batch_size,
-            self.hp.conv1_out_channels,
+            self.hp.conv1a_out_channels,
             q.FREQ_STEPS,
             q.TIME_STEPS,
+        )
+
+        out = self.activation(self.conv1b(out))
+        assert out.size() == (
+            batch_size,
+            self.hp.conv1b_out_channels,
+            q.FREQ_STEPS,
+            q.TIME_STEPS,
+        )
+
+        out = self.mp1(out)
+        assert out.size() == (
+            batch_size,
+            self.hp.conv1b_out_channels,
+            self.mp1_out_h,
+            self.mp1_out_w,
         )
 
         out = self.activation(self.conv2(out))
         assert out.size() == (
             batch_size,
             self.hp.conv2_out_channels,
-            1,
-            self.conv2_out_w,
+            self.mp1_out_h,
+            self.mp1_out_w,
+        )
+
+        out = self.mp2(out)
+        assert out.size() == (
+            batch_size,
+            self.hp.conv2_out_channels,
+            self.mp2_out_h,
+            self.mp2_out_w,
         )
 
         out = self.activation(self.linear(torch.flatten(out, start_dim=1)))

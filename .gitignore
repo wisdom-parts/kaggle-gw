@@ -133,3 +133,6 @@ dmypy.json
 
 # Non-shareable PyCharm config files
 MypyConfig.xml
+
+# W&B (http://wandb.ai)
+/wandb
