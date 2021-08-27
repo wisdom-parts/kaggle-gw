@@ -32,7 +32,7 @@ def qtransform_sig(sig: np.ndarray) -> Tuple[np.ndarray, np.ndarray, np.ndarray]
     result: Tuple[np.ndarray, np.ndarray, np.ndarray] = ts.qtransform(
         delta_t=1.0 / TIME_STEPS_PER_SEC, frange=(30, 350), logfsteps=FREQ_STEPS
     )
-    assert result[2].shape == OUTPUT_SHAPE
+    assert result[2].shape == OUTPUT_SHAPE[1:]
     return result
 
 
