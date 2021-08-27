@@ -151,9 +151,9 @@ class Manager(ModelManager):
         model = Cnn(hp, device=device)
         model.to(device, dtype=hp.dtype)
 
-        wandb.watch(model, log_freq=100)
-
         loss_fn = nn.CrossEntropyLoss()
+
+        wandb.watch(model, criterion=loss_fn, log="all", log_freq=10)
 
         train_dataloader = DataLoader(
             train_dataset, batch_size=hp.batch_size, shuffle=True
@@ -164,10 +164,12 @@ class Manager(ModelManager):
 
         print(hp)
 
+        optimizer = torch.optim.Adam(model.parameters(), lr=hp.lr)
+
         for epoch in range(hp.n_epochs):
             print(f"---------------- Epoch {epoch + 1} ----------------")
-            self.train_epoch(model, loss_fn, train_dataloader, len(train_dataset), hp)
-            self.test(model, loss_fn, test_dataloader, len(test_dataset))
+            self.train_epoch(model, loss_fn, train_dataloader, len(train_dataset), hp, optimizer)
+            self.test(model, loss_fn, test_dataloader, len(test_dataset), optimizer)
 
         print("Done!")
 
@@ -178,24 +180,22 @@ class Manager(ModelManager):
         dataloader: DataLoader,
         num_examples: int,
         hp: HyperParameters,
+        optimizer: torch.optim.Optimizer,
     ):
-        optimizer = torch.optim.Adam(model.parameters(), lr=hp.lr)
-
         for batch_num, (X, y) in enumerate(dataloader):
+            
+            optimizer.zero_grad()
+
             # Compute prediction and loss
             pred = model(X)
             loss = loss_fn(pred, y)
-
-            # Backpropagation
-            optimizer.zero_grad()
             loss.backward()
             optimizer.step()
+            wandb.log({"loss": loss.item()})
 
             if batch_num % 100 == 0:
-                loss_val = loss.item()
                 i = batch_num * len(X)
-                print(f"training loss: {loss_val:>7f}  [{i:>5d}/{num_examples:>5d}]")
-                wandb.log({"loss": loss_val})
+                print(f"training loss: {loss.item():>7f}  [{i:>5d}/{num_examples:>5d}]")
 
     @staticmethod
     def test(
@@ -203,6 +203,7 @@ class Manager(ModelManager):
         loss_fn: Callable[[Tensor, Tensor], Tensor],
         dataloader: DataLoader,
         num_examples: int,
+        optimizer: torch.optim.Optimizer,
     ):
         num_batches = len(dataloader)
         test_loss = 0.0
