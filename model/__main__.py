@@ -36,8 +36,6 @@ if __name__ == "__main__":
     )
     args = arg_parser.parse_args()
 
-    wandb.init(project="g2net-" + args.model)
-
     model_class = models[args.model]
     model = model_class()
     train_model(model, args.source)

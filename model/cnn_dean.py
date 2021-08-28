@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, asdict
 from typing import Callable
 
 import torch
@@ -8,14 +8,14 @@ from torch.utils.data import DataLoader
 
 import preprocess.qtransform as q
 from gw_util import *
-from model import ModelManager, gw_train_and_test_datasets
+from model import HyperParameters, ModelManager, gw_train_and_test_datasets
 
 
 @dataclass()
-class HyperParameters:
+class CnnHyperParameters(HyperParameters):
     batch_size: int = 64
-    n_epochs: int = 1000
-    lr: float = 0.0001
+    n_epochs: int = 100
+    lr: float = 0.0003
     dtype: torch.dtype = torch.float32
 
     conv1a_out_channels: int = 3
@@ -37,7 +37,7 @@ class Cnn(nn.Module):
     output size: (batch_size, 2)
     """
 
-    def __init__(self, hp: HyperParameters, device: torch.device):
+    def __init__(self, hp: CnnHyperParameters, device: torch.device):
         super().__init__()
         self.hp = hp
         self.device = device
@@ -136,7 +136,8 @@ class Cnn(nn.Module):
 class Manager(ModelManager):
     def train(self, source: Path, device: torch.device):
 
-        hp = HyperParameters()
+        hp = CnnHyperParameters()
+        wandb.init(project="g2net-cnn_dean", config=asdict(hp))
 
         def transform(x: np.ndarray) -> torch.Tensor:
             return torch.tensor(x, dtype=hp.dtype, device=device)
@@ -153,7 +154,7 @@ class Manager(ModelManager):
 
         loss_fn = nn.CrossEntropyLoss()
 
-        wandb.watch(model, criterion=loss_fn, log="all", log_freq=1)
+        wandb.watch(model, criterion=loss_fn, log="all", log_freq=100)
 
         train_dataloader = DataLoader(
             train_dataset, batch_size=hp.batch_size, shuffle=True
@@ -169,7 +170,7 @@ class Manager(ModelManager):
         for epoch in range(hp.n_epochs):
             print(f"---------------- Epoch {epoch + 1} ----------------")
             self.train_epoch(model, loss_fn, train_dataloader, len(train_dataset), hp, optimizer)
-            self.test(model, loss_fn, test_dataloader, len(test_dataset), optimizer)
+            self.test(model, loss_fn, test_dataloader, len(test_dataset))
 
         print("Done!")
 
@@ -179,20 +180,20 @@ class Manager(ModelManager):
         loss_fn: Callable[[Tensor, Tensor], Tensor],
         dataloader: DataLoader,
         num_examples: int,
-        hp: HyperParameters,
+        hp: CnnHyperParameters,
         optimizer: torch.optim.Optimizer,
     ):
         for batch_num, (X, y) in enumerate(dataloader):
-            
+
             optimizer.zero_grad()
 
-            # Compute prediction and loss
             pred = model(X)
             loss = loss_fn(pred, y)
+
             loss.backward()
             optimizer.step()
-            wandb.log({"pred": pred.detach().cpu().numpy(), "loss": loss.item()})
 
+            wandb.log({"train_pred": pred.detach().cpu().numpy(), "train_loss": loss.item()})
             if batch_num % 100 == 0:
                 i = batch_num * len(X)
                 print(f"training loss: {loss.item():>7f}  [{i:>5d}/{num_examples:>5d}]")
@@ -203,7 +204,6 @@ class Manager(ModelManager):
         loss_fn: Callable[[Tensor, Tensor], Tensor],
         dataloader: DataLoader,
         num_examples: int,
-        optimizer: torch.optim.Optimizer,
     ):
         num_batches = len(dataloader)
         test_loss = 0.0
@@ -216,7 +216,8 @@ class Manager(ModelManager):
                 correct += (pred.argmax(1) == y).type(torch.float).sum().item()
 
         test_loss /= num_batches
-        correct /= num_examples
+        test_accuracy = 100.0 * correct / num_examples
         print(
-            f"----\ntest metrics: Accuracy: {(100 * correct):>0.1f}%, Avg loss: {test_loss:>8f} \n"
+            f"----\ntest metrics: Accuracy: {test_accuracy:>0.1f}%, Avg loss: {test_loss:>8f} \n"
         )
+        wandb.log({"test_loss": test_loss, "test_accuracy": test_accuracy})

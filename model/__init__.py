@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
 from pathlib import Path
 from typing import List, Dict, Tuple, Optional, Callable
 
@@ -60,6 +61,14 @@ def gw_train_and_test_datasets(
     num_train_examples = int(num_examples * 0.8)
     num_test_examples = num_examples - num_train_examples
     return random_split(dataset, [num_train_examples, num_test_examples])
+
+
+@dataclass()
+class HyperParameters:
+    batch_size: int = 64
+    n_epochs: int = 100
+    lr: float = 0.0003
+    dtype: torch.dtype = torch.float32
 
 
 class ModelManager(ABC):
