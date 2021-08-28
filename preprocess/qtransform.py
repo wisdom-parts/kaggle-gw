@@ -2,20 +2,12 @@ from typing import Tuple
 
 import numpy as np
 
-from gw_util import (
+from gw_data import (
     N_SIGNALS,
     SIGNAL_LEN,
-    SIGNAL_SECS,
-    timeseries_from_signal,
-    window_sigs,
 )
-
-FREQ_STEPS = 30
-
-TIME_STEPS_PER_SEC = 64
-TIME_STEPS = round(SIGNAL_SECS * TIME_STEPS_PER_SEC)
-
-OUTPUT_SHAPE = (N_SIGNALS, FREQ_STEPS, TIME_STEPS)
+from gw_processing import timeseries_from_signal, window_sigs
+from qtransform_params import FREQ_STEPS, TIME_STEPS_PER_SEC, OUTPUT_SHAPE
 
 
 def qtransform_sig(sig: np.ndarray) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:

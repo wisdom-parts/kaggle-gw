@@ -4,8 +4,9 @@ from typing import Callable, Mapping, Tuple, Dict
 
 import numpy as np
 
-from gw_util import *
-from gw_util import make_data_dirs
+from command_line import path_that_does_not_exist
+from gw_data import *
+from gw_data import make_data_dirs
 from preprocess import filter_sig
 
 # Yields random test data as a g2net (3, 4096) array and a boolean label.

@@ -1,12 +1,11 @@
 import argparse
-import collections
-import shutil
 import datetime
+import shutil
 from typing import Callable, Mapping, Optional, Set
-import random
 
-from gw_util import *
-from gw_util import make_data_dirs
+from gw_data import *
+from gw_data import make_data_dirs
+from command_line import path_to_dir
 from preprocess import filter_sig, qtransform
 
 ProcessFunction = Callable[[np.ndarray], np.ndarray]

@@ -4,7 +4,7 @@ from typing import Tuple
 import numpy as np
 import pandas as pd
 
-from gw_util import N_SIGNALS, SIGNAL_LEN
+from gw_data import N_SIGNALS, SIGNAL_LEN
 
 WINDOW_LEN = 20
 

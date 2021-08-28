@@ -4,11 +4,13 @@ import pycbc.filter
 import scipy.signal
 from pycbc.types import TimeSeries
 
-from gw_util import N_SIGNALS, SIGNAL_LEN, timeseries_from_signal
+from gw_data import N_SIGNALS, SIGNAL_LEN
 
 # Given that the most visible signals I have looked at
 # (all of the signals?) show up in a t range of roughly (1.3, 1.8),
 # we need a shorter, steeper shoulder than the default alpha=0.5.
+from gw_processing import timeseries_from_signal
+
 TUKEY_WINDOW = scipy.signal.windows.tukey(4096, alpha=0.2)
 
 

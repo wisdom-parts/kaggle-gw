@@ -2,12 +2,9 @@ import os
 import random
 from pathlib import Path
 from string import hexdigits
-from typing import List, Tuple
+from typing import List
 
 import numpy as np
-import scipy.signal
-
-from pycbc.types import TimeSeries
 
 N_SIGNALS = 3
 SIGNAL_NAMES = ["LIGO Hanford", "LIGO Livingston", "Virgo"]
@@ -83,38 +80,8 @@ def validate_source_dir(source_dir: Path) -> bool:
         return True
 
 
-def timeseries_from_signal(sig: np.ndarray) -> TimeSeries:
-    return TimeSeries(sig, epoch=0, delta_t=DELTA_T)
-
-
-def timeseries_from_signals(sigs: np.ndarray) -> List[TimeSeries]:
-    return [timeseries_from_signal(sigs[i]) for i in range(N_SIGNALS)]
-
-
-TUKEY_WINDOW = scipy.signal.tukey(4096, alpha=0.2)
-
-
-def window_sigs(sigs: np.ndarray) -> np.ndarray:
-    return sigs * TUKEY_WINDOW
-
-
 def make_data_dirs(train_or_test_dir: Path):
     for i in hex_low:
         for j in hex_low:
             for k in hex_low:
                 (train_or_test_dir / i / j / k).mkdir(parents=True)
-
-
-def path_that_does_not_exist(s: str) -> Path:
-    path = Path(s)
-    if path.exists():
-        raise FileExistsError
-    else:
-        return path
-
-
-def path_to_dir(s: str) -> Path:
-    if os.path.isdir(s):
-        return Path(s)
-    else:
-        raise NotADirectoryError(s)
