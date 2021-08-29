@@ -14,12 +14,13 @@ dependencies:
   - pre-commit
   - pytest
   - python
-  - pytorch-gpu
+  - pytorch #-gpu
   - seaborn
   - torchaudio
   - torchvision
   - typeguard
   - pip
   - pip:
-    - pycbc
-    - wandb
+      - datargs
+      - pycbc
+      - wandb

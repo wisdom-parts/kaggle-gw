@@ -1,8 +1,10 @@
 from dataclasses import dataclass, asdict
 from enum import Enum, auto
+from typing import Type
 
 import torch
 import wandb
+from datargs import argsclass
 from torch import nn, Tensor
 
 from gw_data import *
@@ -15,8 +17,9 @@ class RnnType(Enum):
     GRU = auto()
 
 
-@dataclass()
-class RnnHyperParameters(HyperParameters):
+@argsclass(name="sig_rnn")
+@dataclass
+class SigRnnHp(HyperParameters):
     n_epochs: int = 100
     lr: float = 0.005
     dtype: torch.dtype = torch.float32
@@ -25,6 +28,10 @@ class RnnHyperParameters(HyperParameters):
     hidden_dim: int = 7
     n_layers: int = 1
     bidirectional: bool = False
+
+    @property
+    def manager_class(self) -> Type[ModelManager]:
+        return Manager
 
 
 class Rnn(nn.Module):
@@ -35,7 +42,7 @@ class Rnn(nn.Module):
     output size: (batch_size, 2)
     """
 
-    def __init__(self, device: torch.device, hp: RnnHyperParameters):
+    def __init__(self, device: torch.device, hp: SigRnnHp):
         super().__init__()
         self.hp = hp
         self.device = device
@@ -91,7 +98,10 @@ class Rnn(nn.Module):
 
 
 class Manager(ModelManager):
-    def train(self, source: Path, device: torch.device):
-        hp = RnnHyperParameters()
-        wandb.init(project="g2net-sig_rnn_conventional", config=asdict(hp))
-        self._train(Rnn(device, hp), device, source, hp)
+    def train(self, sources: List[Path], device: torch.device, hp: HyperParameters):
+        if len(sources) != 1:
+            raise ValueError("must have exactly one source; got {len(sources)}")
+        if not isinstance(hp, SigRnnHp):
+            raise ValueError("wrong hyper-parameter class: {hp}")
+        wandb.init(project="g2net-" + __name__, config=asdict(hp))
+        self._train(Rnn(device, hp), device, sources[0], hp)

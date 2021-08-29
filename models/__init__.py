@@ -1,7 +1,7 @@
 from abc import abstractmethod, ABC
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional, Callable, List, Dict, Tuple
+from typing import Optional, Callable, List, Dict, Tuple, Type
 
 import numpy as np
 import torch
@@ -64,17 +64,9 @@ def gw_train_and_test_datasets(
     return random_split(dataset, [num_train_examples, num_test_examples])
 
 
-@dataclass()
-class HyperParameters:
-    batch_size: int = 64
-    n_epochs: int = 100
-    lr: float = 0.0003
-    dtype: torch.dtype = torch.float32
-
-
 class ModelManager(ABC):
     @abstractmethod
-    def train(self, source: Path, device: torch.device):
+    def train(self, sources: List[Path], device: torch.device, hp: "HyperParameters"):
         pass
 
     def _train_epoch(
@@ -127,7 +119,11 @@ class ModelManager(ABC):
         wandb.log({"test_loss": test_loss, "test_accuracy": test_accuracy})
 
     def _train(
-        self, model: nn.Module, device: torch.device, source: Path, hp: HyperParameters
+        self,
+        model: nn.Module,
+        device: torch.device,
+        source: Path,
+        hp: "HyperParameters",
     ):
         def transform(x: np.ndarray) -> torch.Tensor:
             return torch.tensor(x, dtype=hp.dtype, device=device)
@@ -149,7 +145,7 @@ class ModelManager(ABC):
         )
         print(hp)
         optimizer = torch.optim.Adam(model.parameters(), lr=hp.lr)
-        for epoch in range(hp.n_epochs):
+        for epoch in range(hp.epochs):
             print(f"---------------- Epoch {epoch + 1} ----------------")
             self._train_epoch(
                 model, loss_fn, train_dataloader, len(train_dataset), optimizer
@@ -158,11 +154,24 @@ class ModelManager(ABC):
         print("Done!")
 
 
-def train_model(manager: ModelManager, source: Path):
-    validate_source_dir(source)
+@dataclass()
+class HyperParameters:
+    batch_size: int = 64
+    epochs: int = 100
+    lr: float = 0.0003
+    dtype: torch.dtype = torch.float32
+
+    @property
+    def manager_class(self) -> Type[ModelManager]:
+        return ModelManager
+
+
+def train_model(manager: ModelManager, sources: List[Path], hp: HyperParameters):
+    for source in sources:
+        validate_source_dir(source)
 
     device_name = "cuda" if torch.cuda.is_available() else "cpu"
     print(f"Using device {device_name}")
     device = torch.device(device_name)
 
-    manager.train(source, device)
+    manager.train(sources, device, hp)

@@ -1,7 +1,9 @@
 from dataclasses import dataclass, asdict
+from typing import Type
 
 import torch
 import wandb
+from datargs import argsclass
 from torch import nn, Tensor
 
 import qtransform_params
@@ -9,10 +11,11 @@ from gw_data import *
 from models import HyperParameters, ModelManager
 
 
-@dataclass()
-class CnnHyperParameters(HyperParameters):
+@argsclass(name="q_cnn")
+@dataclass
+class QCnnHp(HyperParameters):
     batch_size: int = 64
-    n_epochs: int = 100
+    epochs: int = 100
     lr: float = 0.0003
     dtype: torch.dtype = torch.float32
 
@@ -27,6 +30,10 @@ class CnnHyperParameters(HyperParameters):
     mp2_h: int = 3
     mp2_w: int = 4
 
+    @property
+    def manager_class(self) -> Type[ModelManager]:
+        return Manager
+
 
 class Cnn(nn.Module):
     """
@@ -35,7 +42,7 @@ class Cnn(nn.Module):
     output size: (batch_size, 2)
     """
 
-    def __init__(self, device: torch.device, hp: CnnHyperParameters):
+    def __init__(self, device: torch.device, hp: QCnnHp):
         super().__init__()
         self.hp = hp
         self.device = device
@@ -132,7 +139,11 @@ class Cnn(nn.Module):
 
 
 class Manager(ModelManager):
-    def train(self, source: Path, device: torch.device):
-        hp = CnnHyperParameters()
-        wandb.init(project="g2net-q_cnn_conventional", config=asdict(hp))
-        self._train(Cnn(device, hp), device, source, hp)
+    def train(self, sources: List[Path], device: torch.device, hp: HyperParameters):
+        if len(sources) != 1:
+            raise ValueError("must have exactly one source; got {len(sources)}")
+        if not isinstance(hp, QCnnHp):
+            raise ValueError("wrong hyper-parameter class: {hp}")
+
+        wandb.init(project="g2net-" + __name__, config=asdict(hp))
+        self._train(Cnn(device, hp), device, sources[0], hp)
