@@ -100,7 +100,7 @@ class Cnn(nn.Module):
 
         self.linear2 = nn.Linear(
             in_features=hp.linear1_out_features,
-            out_features=2,
+            out_features=1,
         )
         self.activation = nn.ReLU()
 
@@ -159,8 +159,8 @@ class Cnn(nn.Module):
         out = self.activation(self.linear1(torch.flatten(out, start_dim=1)))
         assert out.size() == (batch_size, self.hp.linear1_out_features)
 
-        out = self.activation(self.linear2(out))
-        assert out.size() == (batch_size, 2)
+        out = self.linear2(out)
+        assert out.size() == (batch_size, 1)
 
         return out
 

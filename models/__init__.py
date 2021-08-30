@@ -129,13 +129,13 @@ class ModelManager(ABC):
             return torch.tensor(x, dtype=hp.dtype, device=device)
 
         def target_transform(y: int) -> torch.Tensor:
-            return torch.tensor(y, dtype=torch.long, device=device)
+            return torch.tensor((y,), dtype=hp.dtype, device=device)
 
         train_dataset, test_dataset = gw_train_and_test_datasets(
             source, transform, target_transform
         )
         model.to(device, dtype=hp.dtype)
-        loss_fn = nn.CrossEntropyLoss()
+        loss_fn = nn.BCEWithLogitsLoss()
         wandb.watch(model, criterion=loss_fn, log="all", log_freq=100)
         train_dataloader = DataLoader(
             train_dataset, batch_size=hp.batch_size, shuffle=True
