@@ -1,6 +1,7 @@
 from typing import Tuple
 
 import numpy as np
+import torch
 
 from gw_data import (
     N_SIGNALS,
@@ -30,10 +31,7 @@ def qtransform_sig(sig: np.ndarray) -> Tuple[np.ndarray, np.ndarray, np.ndarray]
 
 def process_sig(sig: np.ndarray) -> np.ndarray:
     _, _, result = qtransform_sig(sig)
-    # Normalize to (0.0 .. 1.0)
-    result = result - result.min()
-    result = result / result.max()
-    return result
+    return (result - np.mean(result)) / np.std(result)
 
 
 def process(sigs: np.ndarray) -> np.ndarray:

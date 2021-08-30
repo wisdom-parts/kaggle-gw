@@ -50,10 +50,7 @@ def process_sig(sig: np.ndarray) -> np.ndarray:
     bandpassed = bandpass_ts(white)
 
     preprocessed = np.array(bandpassed)
-    # Normalize to [0, 1]
-    result = preprocessed - preprocessed.min()
-    result = result / result.max()
-    return result
+    return (preprocessed - np.mean(preprocessed)) / np.std(preprocessed)
 
 
 def process(sigs: np.ndarray) -> np.ndarray:
