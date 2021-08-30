@@ -109,7 +109,8 @@ class ModelManager(ABC):
             for X, y in dataloader:
                 pred = model(X)
                 test_loss += loss_fn(pred, y).item()
-                correct += (pred.argmax(1) == y).type(torch.float).sum().item()
+                correct_in_batch = torch.count_nonzero(torch.eq(pred > 0.0, y > 0.0))
+                correct += correct_in_batch
 
         test_loss /= num_batches
         test_accuracy = 100.0 * correct / num_examples
