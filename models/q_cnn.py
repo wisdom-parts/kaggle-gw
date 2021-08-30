@@ -172,5 +172,5 @@ class Manager(ModelManager):
         if not isinstance(hp, QCnnHp):
             raise ValueError("wrong hyper-parameter class: {hp}")
 
-        wandb.init(project="g2net-" + __name__, config=asdict(hp))
+        wandb.init(project="g2net-" + __name__, entity="wisdom", config=asdict(hp))
         self._train(Cnn(device, hp), device, sources[0], hp)
