@@ -105,7 +105,7 @@ class Cnn(nn.Module):
         self.activation = nn.ReLU()
 
     def forward(self, x: Tensor) -> Tensor:
-        batch_size = x.size()[0]
+        batch_size = x.size()[0] # x is 64, 3, 32, 128
         assert x.size()[1:] == qtransform_params.OUTPUT_SHAPE
 
         out = self.activation(self.conv1(x))
@@ -114,9 +114,9 @@ class Cnn(nn.Module):
             self.hp.conv1_out_channels,
             qtransform_params.FREQ_STEPS,
             qtransform_params.TIME_STEPS,
-        )
+        ) # (64, 20, 32, 128)
 
-        out = self.mp1(out)
+        out = self.mp1(out) # (64, 20, 16, 64)
         assert out.size() == (
             batch_size,
             self.hp.conv1_out_channels,
@@ -124,7 +124,7 @@ class Cnn(nn.Module):
             self.mp1_out_w,
         )
 
-        out = self.activation(self.conv2(out))
+        out = self.activation(self.conv2(out)) # (64, 20, 16, 64)
         assert out.size() == (
             batch_size,
             self.hp.conv2_out_channels,
@@ -132,7 +132,7 @@ class Cnn(nn.Module):
             self.mp1_out_w,
         )
 
-        out = self.mp2(out)
+        out = self.mp2(out) # 64, 20, 8, 32
         assert out.size() == (
             batch_size,
             self.hp.conv2_out_channels,
