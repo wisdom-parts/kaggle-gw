@@ -104,12 +104,28 @@ class ModelManager(ABC):
         num_batches = len(dataloader)
         test_loss = 0.0
         correct = 0.0
+        fp = 0.0
+        fn = 0.0
+        tp = 0.0
+        tn = 0.0
 
         with torch.no_grad():
             for X, y in dataloader:
                 pred = model(X)
                 test_loss += loss_fn(pred, y).item()
                 correct_in_batch = torch.count_nonzero(torch.eq(pred > 0.0, y > 0.0))
+                tp_in_batch = torch.sum(torch.bitwise_and(pred > 0.0, y == 1))
+                tp += tp_in_batch
+
+                fp_in_batch = torch.sum(torch.bitwise_and(pred > 0.0, y == 0))
+                fp += fp_in_batch
+
+                tn_in_batch = torch.sum(torch.bitwise_and(pred < 0.0, y == 0))
+                tn += tn_in_batch
+
+                fn_in_batch = torch.sum(torch.bitwise_and(pred < 0.0, y == 1))
+                fn += fn_in_batch
+
                 correct += correct_in_batch
 
         test_loss /= num_batches
@@ -118,6 +134,7 @@ class ModelManager(ABC):
             f"----\ntest metrics: Accuracy: {test_accuracy:>0.1f}%, Avg loss: {test_loss:>8f} \n"
         )
         wandb.log({"test_loss": test_loss, "test_accuracy": test_accuracy})
+        wandb.log({"TP": tp, "FP": fp, "TN": tn, "FN": fn, "num_examples": num_examples})
 
     def _train(
         self,
