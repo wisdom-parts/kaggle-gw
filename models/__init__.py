@@ -74,7 +74,7 @@ def gw_train_and_test_datasets(
     return MyDatasets(gw, train, test)
 
 
-SAMPLES_TO_CHECK = 100
+SAMPLES_TO_CHECK = 300
 MAX_SAMPLES_PER_KEY = 6
 
 
