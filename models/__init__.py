@@ -1,3 +1,4 @@
+import random
 from abc import abstractmethod, ABC
 from dataclasses import dataclass
 from pathlib import Path
@@ -7,22 +8,22 @@ import numpy as np
 import torch
 import wandb
 from torch import Tensor, nn
-from torch.utils.data import Dataset, random_split, DataLoader
+from torch.utils.data import Dataset, random_split, DataLoader, Subset
 
 from gw_data import training_labels_file, train_file, validate_source_dir
 
 
-class GwDataset(Dataset):
+class GwDataset(Dataset[Tuple[Tensor, Tensor]]):
     """
-    Represents the training examples of a g2net data directory as float32 Tensor's
+    Represents the training examples of a g2net data directory as Tensor's
     of size (N_SIGNALS, SIGNAL_LEN).
     """
 
     def __init__(
         self,
         source: Path,
-        transform: Optional[Callable] = None,
-        target_transform: Optional[Callable] = None,
+        transform: Callable[[np.ndarray], Tensor],
+        target_transform: Callable[[int], Tensor],
     ):
         self.source = source
         self.transform = transform
@@ -43,25 +44,38 @@ class GwDataset(Dataset):
         _id = self.ids[idx]
         fpath = str(train_file(self.source, _id))
 
-        x = np.load(fpath)
-        if self.transform:
-            x = self.transform(x)
-
-        y = self.id_to_label[_id]
-        if self.target_transform:
-            y = self.target_transform(y)
+        x = self.transform(np.load(fpath))
+        y = self.target_transform(self.id_to_label[_id])
 
         return x, y
 
 
+@dataclass
+class MyDatasets:
+    gw: GwDataset
+    train: Subset[Tuple[Tensor, Tensor]]
+    test: Subset[Tuple[Tensor, Tensor]]
+
+
 def gw_train_and_test_datasets(
-    source: Path, transform: Optional[Callable], target_transform: Optional[Callable]
-):
-    dataset = GwDataset(source, transform=transform, target_transform=target_transform)
-    num_examples = len(dataset)
+    source: Path, dtype: torch.dtype, device: torch.device
+) -> MyDatasets:
+    def transform(x: np.ndarray) -> torch.Tensor:
+        return torch.tensor(x, dtype=dtype, device=device)
+
+    def target_transform(y: int) -> torch.Tensor:
+        return torch.tensor((y,), dtype=dtype, device=device)
+
+    gw = GwDataset(source, transform=transform, target_transform=target_transform)
+    num_examples = len(gw)
     num_train_examples = int(num_examples * 0.8)
     num_test_examples = num_examples - num_train_examples
-    return random_split(dataset, [num_train_examples, num_test_examples])
+    train, test = random_split(gw, [num_train_examples, num_test_examples])
+    return MyDatasets(gw, train, test)
+
+
+SAMPLES_TO_CHECK = 100
+MAX_SAMPLES_PER_KEY = 6
 
 
 class ModelManager(ABC):
@@ -94,6 +108,7 @@ class ModelManager(ABC):
                 i = batch_num * len(X)
                 print(f"training loss: {loss.item():>7f}  [{i:>5d}/{num_examples:>5d}]")
 
+    # noinspection PyCallingNonCallable
     def _test(
         self,
         model: nn.Module,
@@ -112,29 +127,34 @@ class ModelManager(ABC):
         with torch.no_grad():
             for X, y in dataloader:
                 pred = model(X)
-                test_loss += loss_fn(pred, y).item()
-                correct_in_batch = torch.count_nonzero(torch.eq(pred > 0.0, y > 0.0))
-                tp_in_batch = torch.sum(torch.bitwise_and(pred > 0.0, y == 1))
-                tp += tp_in_batch
+                loss = loss_fn(pred, y)
 
-                fp_in_batch = torch.sum(torch.bitwise_and(pred > 0.0, y == 0))
-                fp += fp_in_batch
+                test_loss += loss.item()
 
-                tn_in_batch = torch.sum(torch.bitwise_and(pred < 0.0, y == 0))
-                tn += tn_in_batch
+                correct += torch.sum(torch.eq(pred > 0.0, y > 0.0)).item()
 
-                fn_in_batch = torch.sum(torch.bitwise_and(pred < 0.0, y == 1))
-                fn += fn_in_batch
+                tp += torch.sum(torch.bitwise_and(pred > 0.0, y == 1)).item()
+                fp += torch.sum(torch.bitwise_and(pred > 0.0, y == 0)).item()
 
-                correct += correct_in_batch
+                tn += torch.sum(torch.bitwise_and(pred < 0.0, y == 0)).item()
+                fn += torch.sum(torch.bitwise_and(pred < 0.0, y == 1)).item()
 
         test_loss /= num_batches
         test_accuracy = 100.0 * correct / num_examples
         print(
             f"----\ntest metrics: Accuracy: {test_accuracy:>0.1f}%, Avg loss: {test_loss:>8f} \n"
         )
-        wandb.log({"test_loss": test_loss, "test_accuracy": test_accuracy})
-        wandb.log({"TP": tp, "FP": fp, "TN": tn, "FN": fn, "num_examples": num_examples})
+        wandb.log(
+            {
+                "test_loss": test_loss,
+                "test_accuracy": test_accuracy,
+                "TP": tp,
+                "FP": fp,
+                "TN": tn,
+                "FN": fn,
+                "num_examples": num_examples,
+            }
+        )
 
     def _train(
         self,
@@ -143,32 +163,60 @@ class ModelManager(ABC):
         source: Path,
         hp: "HyperParameters",
     ):
-        def transform(x: np.ndarray) -> torch.Tensor:
-            return torch.tensor(x, dtype=hp.dtype, device=device)
-
-        def target_transform(y: int) -> torch.Tensor:
-            return torch.tensor((y,), dtype=hp.dtype, device=device)
-
-        train_dataset, test_dataset = gw_train_and_test_datasets(
-            source, transform, target_transform
-        )
+        data = gw_train_and_test_datasets(source, hp.dtype, device)
         model.to(device, dtype=hp.dtype)
         loss_fn = nn.BCEWithLogitsLoss()
         wandb.watch(model, criterion=loss_fn, log="all", log_freq=100)
         train_dataloader = DataLoader(
-            train_dataset, batch_size=hp.batch_size, shuffle=True
+            data.train, batch_size=hp.batch_size, shuffle=True
         )
-        test_dataloader = DataLoader(
-            test_dataset, batch_size=hp.batch_size, shuffle=True
-        )
+        test_dataloader = DataLoader(data.test, batch_size=hp.batch_size, shuffle=True)
         print(hp)
         optimizer = torch.optim.Adam(model.parameters(), lr=hp.lr)
         for epoch in range(hp.epochs):
             print(f"---------------- Epoch {epoch + 1} ----------------")
             self._train_epoch(
-                model, loss_fn, train_dataloader, len(train_dataset), optimizer
+                model, loss_fn, train_dataloader, len(data.train), optimizer
             )
-            self._test(model, loss_fn, test_dataloader, len(test_dataset))
+            self._test(model, loss_fn, test_dataloader, len(data.test))
+
+        confusion_sample_indices = (
+            random.sample(data.test.indices, SAMPLES_TO_CHECK)
+            if len(data.test) > SAMPLES_TO_CHECK
+            else data.test.indices
+        )
+        confusion_sample: Dict[str, List[str]] = {}
+
+        def add_to_sample(key: str, _id: str):
+            if key not in confusion_sample:
+                confusion_sample[key] = [_id]
+            elif len(confusion_sample[key]) < MAX_SAMPLES_PER_KEY:
+                confusion_sample[key].append(_id)
+
+        for i in confusion_sample_indices:
+            _id = data.gw.ids[i]
+            x, y = data.gw[i]
+            # add batch dimension
+            x = torch.unsqueeze(x, 0)
+            y = torch.unsqueeze(y, 0)
+            pred = model(x)
+
+            yv = y.item()
+            pv = pred.item()
+            if yv:
+                if pv > 0.0:
+                    add_to_sample("tp", _id)
+                else:
+                    add_to_sample("fn", _id)
+            else:
+                if pv > 0.0:
+                    add_to_sample("fp", _id)
+                else:
+                    add_to_sample("tn", _id)
+
+        print("Confusion matrix sample:")
+        print(repr(confusion_sample))
+
         print("Done!")
 
 
