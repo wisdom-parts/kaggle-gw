@@ -129,13 +129,14 @@ class Cnn(nn.Module):
             in_features=hp.linear1_out_features,
             out_features=1,
         )
-        self.activation = nn.ReLU()
+        self.cnn_activation = nn.ReLU()
+        self.linear_activation = nn.ReLU()
 
     def forward(self, x: Tensor) -> Tensor:
         batch_size = x.size()[0] # x is 64, 3, 32, 128
         assert x.size()[1:] == qtransform_params.OUTPUT_SHAPE
 
-        out = self.activation(self.conv1(x))
+        out = self.conv1(x)
         assert out.size() == (
             batch_size,
             self.hp.conv1_out_channels,
@@ -143,7 +144,7 @@ class Cnn(nn.Module):
             qtransform_params.TIME_STEPS,
         ) # (64, 20, 32, 128)
 
-        out = self.mp1(out) # (64, 20, 16, 64)
+        out = self.mp1(self.cnn_activation(out)) # (64, 20, 16, 64)
         assert out.size() == (
             batch_size,
             self.hp.conv1_out_channels,
@@ -151,7 +152,7 @@ class Cnn(nn.Module):
             self.mp1_out_w,
         )
 
-        out = self.activation(self.conv2(out)) # (64, 20, 16, 64)
+        out = self.conv2(out) # (64, 20, 16, 64)
         assert out.size() == (
             batch_size,
             self.hp.conv2_out_channels,
@@ -159,7 +160,7 @@ class Cnn(nn.Module):
             self.mp1_out_w,
         )
 
-        out = self.mp2(out) # 64, 20, 8, 32
+        out = self.mp2(self.cnn_activation(out)) # 64, 20, 8, 32
         assert out.size() == (
             batch_size,
             self.hp.conv2_out_channels,
@@ -167,7 +168,7 @@ class Cnn(nn.Module):
             self.mp2_out_w,
         )
 
-        out = self.activation(self.conv3(out))
+        out = self.conv3(out)
         assert out.size() == (
             batch_size,
             self.hp.conv3_out_channels,
@@ -175,7 +176,7 @@ class Cnn(nn.Module):
             self.mp2_out_w,
         )
 
-        out = self.mp3(out)
+        out = self.mp3(self.cnn_activation(out))
         assert out.size() == (
             batch_size,
             self.hp.conv3_out_channels,
@@ -183,8 +184,17 @@ class Cnn(nn.Module):
             self.mp3_out_w,
         ) # 64, 128, 8, 32
 
-        # out = self.mp3(out)
-        out = self.activation(self.conv4(out))
+        out = self.conv4(out)
+        assert out.size() == (
+            batch_size,
+            self.hp.conv4_out_channels,
+            self.mp3_out_h,
+            self.mp3_out_w,
+        )
+
+        if self.hp.regression_head == RegressionHead.LINEAR:
+            out = self.cnn_activation(out)
+
         out = self.mp4(out)
         assert out.size() == (
             batch_size,
@@ -196,11 +206,11 @@ class Cnn(nn.Module):
         out = torch.flatten(out, start_dim=1)
 
         if self.hp.regression_head == RegressionHead.LINEAR:
-            out = self.linear1(out)
+            out = self.linear1(self.cnn_activation(out))
             assert out.size() == (batch_size, self.hp.linear1_out_features)
 
             if self.hp.linear1_out_features > 1:
-                out = self.linear2(self.dp(out))
+                out = self.linear2(self.dp(self.linear_activation(out)))
         else:
             out = torch.amax(out, dim=1, keepdim=True)
 

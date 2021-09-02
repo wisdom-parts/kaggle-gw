@@ -119,6 +119,7 @@ class ModelManager(ABC):
         num_batches = len(dataloader)
         test_loss = 0.0
         correct = 0.0
+        zero_pred = 0.0
         fp = 0.0
         fn = 0.0
         tp = 0.0
@@ -132,6 +133,8 @@ class ModelManager(ABC):
                 test_loss += loss.item()
 
                 correct += torch.sum(torch.eq(pred > 0.0, y > 0.0)).item()
+
+                zero_pred += torch.sum(pred == 0.0) # more than a few suggests a bug
 
                 tp += torch.sum(torch.bitwise_and(pred > 0.0, y == 1)).item()
                 fp += torch.sum(torch.bitwise_and(pred > 0.0, y == 0)).item()
@@ -148,6 +151,7 @@ class ModelManager(ABC):
             {
                 "test_loss": test_loss,
                 "test_accuracy": test_accuracy,
+                "zero_pred": zero_pred,
                 "TP": tp,
                 "FP": fp,
                 "TN": tn,
