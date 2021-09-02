@@ -1,4 +1,5 @@
 from dataclasses import dataclass, asdict
+from enum import Enum, auto
 from typing import Type
 
 import torch
@@ -10,6 +11,9 @@ import qtransform_params
 from gw_data import *
 from models import HyperParameters, ModelManager
 
+class RegressionHead(Enum):
+    LINEAR = auto()
+    MAX = auto()
 
 @argsclass(name="q_cnn")
 @dataclass
@@ -43,7 +47,10 @@ class QCnnHp(HyperParameters):
     mp4_h: int = 2
     mp4_w: int = 2
 
-    linear1_out_features = 20
+    regression_head: RegressionHead = RegressionHead.LINEAR
+
+    linear1_out_features: int = 20 # if this value is 1, then omit linear2
+    linear1_dropout: float = 0.5
 
     @property
     def manager_class(self) -> Type[ModelManager]:
@@ -113,10 +120,10 @@ class Cnn(nn.Module):
         self.mp4_out_w = self.mp3_out_w // self.hp.mp4_w
 
         self.linear1 = nn.Linear(
-            in_features=hp.conv3_out_channels * self.mp4_out_h * self.mp4_out_w,
-            out_features=1,
+            in_features=hp.conv4_out_channels * self.mp4_out_h * self.mp4_out_w,
+            out_features=hp.linear1_out_features,
         )
-        self.dp = nn.Dropout(p=0.5)
+        self.dp = nn.Dropout(p=self.hp.linear1_dropout)
 
         self.linear2 = nn.Linear(
             in_features=hp.linear1_out_features,
@@ -161,6 +168,13 @@ class Cnn(nn.Module):
         )
 
         out = self.activation(self.conv3(out))
+        assert out.size() == (
+            batch_size,
+            self.hp.conv3_out_channels,
+            self.mp2_out_h,
+            self.mp2_out_w,
+        )
+
         out = self.mp3(out)
         assert out.size() == (
             batch_size,
@@ -179,12 +193,18 @@ class Cnn(nn.Module):
             self.mp4_out_w,
         )
 
-        out = self.linear1(torch.flatten(out, start_dim=1))
+        out = torch.flatten(out, start_dim=1)
+
+        if self.hp.regression_head == RegressionHead.LINEAR:
+            out = self.linear1(out)
+            assert out.size() == (batch_size, self.hp.linear1_out_features)
+
+            if self.hp.linear1_out_features > 1:
+                out = self.linear2(self.dp(out))
+        else:
+            out = torch.amax(out, dim=1, keepdim=True)
+
         assert out.size() == (batch_size, 1)
-
-        # out = self.linear2(self.dp(out))
-        # assert out.size() == (batch_size, 1)
-
         return out
 
 
@@ -195,5 +215,5 @@ class Manager(ModelManager):
         if not isinstance(hp, QCnnHp):
             raise ValueError("wrong hyper-parameter class: {hp}")
 
-        wandb.init(project="g2net-" + __name__, config=asdict(hp))
+        wandb.init(project="g2net-" + __name__, entity="wisdom", config=asdict(hp))
         self._train(Cnn(device, hp), device, sources[0], hp)
