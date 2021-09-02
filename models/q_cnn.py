@@ -143,7 +143,7 @@ class Cnn(nn.Module):
         out = self.activation(self.conv3(out))
         assert out.size() == (
             batch_size,
-            self.hp.conv2_out_channels,
+            self.hp.conv3_out_channels,
             self.mp2_out_h,
             self.mp2_out_w,
         )
