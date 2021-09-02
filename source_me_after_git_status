@@ -1,0 +1,3 @@
+conda activate kaggle-gw
+git pull
+mamba env update -f environment.yml
