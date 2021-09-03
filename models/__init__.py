@@ -172,9 +172,9 @@ class ModelManager(ABC):
         loss_fn = nn.BCEWithLogitsLoss()
         wandb.watch(model, criterion=loss_fn, log="all", log_freq=100)
         train_dataloader = DataLoader(
-            data.train, batch_size=hp.batch_size, shuffle=True
+            data.train, batch_size=hp.batch, shuffle=True
         )
-        test_dataloader = DataLoader(data.test, batch_size=hp.batch_size, shuffle=True)
+        test_dataloader = DataLoader(data.test, batch_size=hp.batch, shuffle=True)
         print(hp)
         optimizer = torch.optim.Adam(model.parameters(), lr=hp.lr)
         for epoch in range(hp.epochs):
@@ -226,7 +226,7 @@ class ModelManager(ABC):
 
 @dataclass()
 class HyperParameters:
-    batch_size: int = 64
+    batch: int = 64
     epochs: int = 100
     lr: float = 0.0003
     dtype: torch.dtype = torch.float32
