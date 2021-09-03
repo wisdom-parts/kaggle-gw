@@ -16,7 +16,7 @@ parameters:
     min: 0.001
     max: 0.01
   epochs:
-    value: 10
+    value: 3
   conv1h:
     values: [5, 7, 9]
   conv1w:
