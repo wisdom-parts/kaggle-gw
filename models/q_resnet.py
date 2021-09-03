@@ -12,17 +12,34 @@ import qtransform_params
 from gw_data import *
 from models import HyperParameters, ModelManager
 
-class RegressionHead(Enum):
-    LINEAR = auto()
-    MAX = auto()
-
 @argsclass(name="q_resnet")
 @dataclass
 class QResnetHp(HyperParameters):
     batch_size: int = 64
     epochs: int = 100
-    lr: float = 0.0003
+    lr: float = 0.001
     dtype: torch.dtype = torch.float32
+    convbn1h = 5
+    convbn1w = 5
+    convbn2h = 5
+    convbn2w = 5
+    convbn3h = 3
+    convbn3w = 3
+    convskiph = 3
+    convskipw = 3
+    mp = 2
+
+    in_channels = 3
+    block1out = 128
+    block2out = 256
+    block3out = 512
+    block4out = 512
+
+    avgpoolh = 2
+    avgpoolw = 8
+
+    linear1in = 512
+    linear1out = 1
 
     @property
     def manager_class(self) -> Type[ModelManager]:
@@ -50,14 +67,16 @@ class ConvBlock(nn.Module):
 
 
 class ResnetBlock(nn.Module):
-    def __init__(self, in_channels, out_channels):
+    def __init__(self, device: torch.device, hp: QResnetHp, in_channels, out_channels):
         super().__init__()
-        self.conv_bn1 = ConvBlock(in_channels, out_channels, (5, 5), (2, 2))
-        self.conv_bn2 = ConvBlock(out_channels, out_channels, (5, 5), (2, 2))
-        self.conv_bn3 = ConvBlock(out_channels, out_channels, (3, 3), (1, 1))
-        self.conv_skip = ConvBlock(in_channels, out_channels, (3, 3), (1, 1))
+        self.hp = hp
+        self.device = device
+        self.conv_bn1 = ConvBlock(in_channels, out_channels, (self.hp.convbn1h, self.hp.convbn1w), (self.hp.convbn1h // 2, self.hp.convbn1h // 2))
+        self.conv_bn2 = ConvBlock(out_channels, out_channels, (self.hp.convbn2h, self.hp.convbn2w), (self.hp.convbn2h // 2, self.hp.convbn2h // 2))
+        self.conv_bn3 = ConvBlock(out_channels, out_channels, (self.hp.convbn3h, self.hp.convbn3w), (self.hp.convbn3h // 2, self.hp.convbn3h // 2))
+        self.conv_skip = ConvBlock(in_channels, out_channels, (self.hp.convskiph, self.hp.convskipw), (self.hp.convskiph // 2, self.hp.convskiph // 2))
         self.activation = nn.ReLU()
-        self.mp = nn.MaxPool2d((2,2))
+        self.mp = nn.MaxPool2d((self.hp.mp, self.hp.mp))
 
     def forward(self, x):
         out = self.conv_bn1.forward(x, True)
@@ -80,25 +99,26 @@ class CnnResnet(nn.Module):
         self.hp = hp
         self.device = device
 
-        self.block1 = ResnetBlock(3, 256) # out_channels=32 # 32,128
-        self.block2 = ResnetBlock(256, 256) # out_channels=64 # 16, 64
-        self.block3 = ResnetBlock(256, 256) # 8, 32
-        self.block4 = ResnetBlock(256, 256) # 4, 16
+        self.block1 = ResnetBlock(device, hp, self.hp.in_channels, self.hp.block1out)
+        self.block2 = ResnetBlock(device, hp, self.hp.block1out, self.hp.block2out)
+        self.block3 = ResnetBlock(device, hp, self.hp.block2out, self.hp.block3out)
+        self.block4 = ResnetBlock(device, hp, self.hp.block3out, self.hp.block4out)
 
-        self.avg_pool = nn.AvgPool2d((2, 8))
+        self.avg_pool = nn.AvgPool2d((self.hp.avgpoolh, self.hp.avgpoolw))
         self.linear1 = nn.Linear(
-            in_features=256,
-            out_features=1,
+            in_features=self.hp.linear1in,
+            out_features=self.hp.linear1out,
         )
 
 
     def forward(self, x: Tensor) -> Tensor:
-        batch_size = x.size()[0]  # x is 64, 3, 32, 128
+        batch_size = x.size()[0]
         assert x.size()[1:] == qtransform_params.OUTPUT_SHAPE
-        out = self.block1.forward(x) # out here is 64, 32, 128
-        out = self.block2.forward(out) # out here is 128, 8, 32
-        out = self.block3.forward(out) # 256, 4, 16
-        out = self.block4.forward(out) # 512, 2, 8
+        out = self.block1.forward(x)
+        assert out.size()[:2] == (batch_size, self.hp.block1out)
+        out = self.block2.forward(out)
+        out = self.block3.forward(out)
+        out = self.block4.forward(out)
         out = self.avg_pool(out)
         out = torch.flatten(out, start_dim=1)
         out = self.linear1(out)
