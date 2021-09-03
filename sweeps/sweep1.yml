@@ -1,0 +1,71 @@
+command:
+  - python
+  - -m
+  - model
+  - q_cnn
+  - --lr 0.001
+  - --epochs 10
+  - ${args}
+  - /home/ec2-user/qtransform-10000
+method: bayes
+conv1-h:
+  values:
+    - 3
+    - 7
+conv1-w:
+  values:
+    - 3
+    - 7
+conv1-out-channels:
+  values:
+    - 3
+    - 9
+    - 27
+conv2-h:
+  values:
+    - 3
+    - 7
+conv2-w:
+  values:
+    - 3
+    - 7
+conv2-out-channels:
+  values:
+    - 3
+    - 9
+    - 27
+conv3-h:
+  values:
+    - 3
+    - 7
+conv3-w:
+  values:
+    - 3
+    - 7
+conv3-out-channels:
+  values:
+    - 3
+    - 9
+    - 27
+conv4-h:
+  values:
+    - 3
+    - 7
+conv4-w:
+  values:
+    - 3
+    - 7
+conv4-out-channels:
+  values:
+    - 1
+    - 10
+    - 30
+linear1_features:
+  values:
+    - 1
+    - 10
+    - 100
+regression-head:
+  values:
+    - MAX
+    - LINEAR
