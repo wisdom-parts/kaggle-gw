@@ -1,0 +1,49 @@
+program: python
+command:
+  - ${program}
+  - -m
+  - model
+  - q_cnn
+  - ${args}
+  - /home/ec2-user/qtransform-10000
+method: bayes
+metric:
+  name: test_loss
+  goal: minimize
+parameters:
+  lr:
+    value: 0.001
+  epochs:
+    value: 10
+  conv1h:
+    values: [3, 5]
+  conv1w:
+    values: [3, 5]
+  conv1out:
+    values: [3, 9, 27]
+  conv2h:
+    values: [3, 5]
+  conv2w:
+    values: [3, 5]
+  conv2out:
+    values: [3, 9, 27]
+  conv3h:
+    values: [3, 5]
+  conv3w:
+    values: [3, 5]
+  conv3out:
+    values: [3, 9, 27]
+  conv4h:
+    values: [3, 5]
+  conv4w:
+    values: [3, 5]
+  conv4out:
+    values: [1, 10, 30]
+  linear1out:
+    values: [1, 10, 100]
+  linear1drop:
+    distribution: uniform
+    min: 0.0
+    max: 0.7
+  head:
+    values: [MAX, LINEAR]

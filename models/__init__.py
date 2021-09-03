@@ -119,6 +119,7 @@ class ModelManager(ABC):
         num_batches = len(dataloader)
         test_loss = 0.0
         correct = 0.0
+        zero_pred = 0.0
         fp = 0.0
         fn = 0.0
         tp = 0.0
@@ -132,6 +133,8 @@ class ModelManager(ABC):
                 test_loss += loss.item()
 
                 correct += torch.sum(torch.eq(pred > 0.0, y > 0.0)).item()
+
+                zero_pred += torch.sum(pred == 0.0) # more than a few suggests a bug
 
                 tp += torch.sum(torch.bitwise_and(pred > 0.0, y == 1)).item()
                 fp += torch.sum(torch.bitwise_and(pred > 0.0, y == 0)).item()
@@ -148,6 +151,7 @@ class ModelManager(ABC):
             {
                 "test_loss": test_loss,
                 "test_accuracy": test_accuracy,
+                "zero_pred": zero_pred,
                 "TP": tp,
                 "FP": fp,
                 "TN": tn,
@@ -168,9 +172,9 @@ class ModelManager(ABC):
         loss_fn = nn.BCEWithLogitsLoss()
         wandb.watch(model, criterion=loss_fn, log="all", log_freq=100)
         train_dataloader = DataLoader(
-            data.train, batch_size=hp.batch_size, shuffle=True
+            data.train, batch_size=hp.batch, shuffle=True
         )
-        test_dataloader = DataLoader(data.test, batch_size=hp.batch_size, shuffle=True)
+        test_dataloader = DataLoader(data.test, batch_size=hp.batch, shuffle=True)
         print(hp)
         optimizer = torch.optim.Adam(model.parameters(), lr=hp.lr)
         for epoch in range(hp.epochs):
@@ -222,7 +226,7 @@ class ModelManager(ABC):
 
 @dataclass()
 class HyperParameters:
-    batch_size: int = 64
+    batch: int = 64
     epochs: int = 100
     lr: float = 0.0003
     dtype: torch.dtype = torch.float32
