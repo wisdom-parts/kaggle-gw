@@ -20,11 +20,6 @@ class QEfficientNetHP(HyperParameters):
     lr: float = 0.0003
     dtype: torch.dtype = torch.float32
 
-    head: RegressionHead = RegressionHead.LINEAR
-
-    linear1out: int = 10 # if this value is 1, then omit linear2
-    linear1drop: float = 0.05
-
     @property
     def manager_class(self) -> Type[ModelManager]:
         return Manager
@@ -36,7 +31,7 @@ class EfficientNet(nn.Module):
     output size: (batch_size, 2)
     """
 
-    def __init__(self, device: torch.device, hp: QCnnHp):
+    def __init__(self, device: torch.device, hp: QEfficientNetHP):
         super().__init__()
         self.hp = hp
         self.device = device
@@ -48,7 +43,7 @@ class EfficientNet(nn.Module):
         batch_size = x.size()[0] # x is 64, 3, 32, 128
         assert x.size()[1:] == qtransform_params.OUTPUT_SHAPE
         out = self.net(x)
-        return x
+        return out
 
 
 class Manager(ModelManager):
