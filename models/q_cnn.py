@@ -15,6 +15,9 @@ class RegressionHead(Enum):
     LINEAR = auto()
     MAX = auto()
 
+def to_odd(i: int) -> int:
+    return (i // 2) * 2 + 1
+
 @argsclass(name="q_cnn")
 @dataclass
 class QCnnHp(HyperParameters):
@@ -23,38 +26,52 @@ class QCnnHp(HyperParameters):
     lr: float = 0.0003
     dtype: torch.dtype = torch.float32
 
-    conv1h: int = 3  # must be odd
-    conv1w: int = 3  # must be odd
-    conv1out: int = 10
+    conv1h: int = 11
+    conv1w: int = 11
+    conv1out: int = 5
     mp1h: int = 2
     mp1w: int = 2
 
-    conv2h: int = 3  # must be odd
-    conv2w: int = 3  # must be odd
-    conv2out: int = 10
+    conv2h: int = 11
+    conv2w: int = 3
+    conv2out: int = 80
     mp2h: int = 2
     mp2w: int = 2
 
-    conv3h: int = 3  # must be odd
-    conv3w: int = 3  # must be odd
-    conv3out: int = 10
+    conv3h: int = 7
+    conv3w: int = 11
+    conv3out: int = 40
     mp3h: int = 2
     mp3w: int = 2
 
-    conv4h: int = 3  # must be odd
-    conv4w: int = 3  # must be odd
+    conv4h: int = 7
+    conv4w: int = 7
     conv4out: int = 10
     mp4h: int = 2
     mp4w: int = 2
 
     head: RegressionHead = RegressionHead.LINEAR
 
-    linear1out: int = 20 # if this value is 1, then omit linear2
-    linear1drop: float = 0.5
+    linear1out: int = 10 # if this value is 1, then omit linear2
+    linear1drop: float = 0.05
 
     @property
     def manager_class(self) -> Type[ModelManager]:
         return Manager
+
+    def __post_init__(self):
+        self.conv1h = to_odd(self.conv1h)
+        self.conv1w = to_odd(self.conv1w)
+
+        self.conv2h = to_odd(self.conv2h)
+        self.conv2w = to_odd(self.conv2w)
+
+        self.conv3h = to_odd(self.conv3h)
+        self.conv3w = to_odd(self.conv3w)
+
+        self.conv4h = to_odd(self.conv4h)
+        self.conv4w = to_odd(self.conv4w)
+
 
 
 class Cnn(nn.Module):
