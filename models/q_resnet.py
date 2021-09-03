@@ -38,7 +38,7 @@ class QResnetHp(HyperParameters):
     avgpoolh = 2
     avgpoolw = 8
 
-    linear1in = 512
+    linear1in = block4out
     linear1out = 1
 
     @property
