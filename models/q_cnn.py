@@ -84,7 +84,7 @@ class Cnn(nn.Module):
         self.conv2 = nn.Conv2d(
             in_channels=hp.conv1out,
             out_channels=hp.conv2out,
-            kernel_size=(hp.conv1h, hp.conv1w),
+            kernel_size=(hp.conv2h, hp.conv2w),
             stride=(1, 1),
             padding=(hp.conv2h // 2, hp.conv2w // 2),
         )
