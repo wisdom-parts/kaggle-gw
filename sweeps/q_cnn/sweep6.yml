@@ -12,51 +12,47 @@ metric:
   goal: minimize
 parameters:
   batch:
-    values: [16, 32, 64, 128, 256]
+    values: [100, 200, 300]
   lr:
-    min: 0.0001
-    max: 0.005
+    min: 0.00005
+    max: 0.002
   epochs:
     value: 3
   conv1h:
-    min: 1
-    max: 40
+    min: 17
+    max: 33
   conv1w:
-    min: 1
-    max: 40
+    values: [1, 3, 5, 7]
   conv1out:
-    min: 1
-    max: 500
+    min: 10
+    max: 200
   conv2h:
-    min: 1
-    max: 40
+    values: [11, 13, 15, 17]
   conv2w:
-    min: 1
-    max: 40
+    min: 9
+    max: 33
   conv2out:
-    min: 1
-    max: 500
+    min: 50
+    max: 250
   conv3h:
-    min: 1
-    max: 40
+    value: 9
   conv3w:
     min: 1
-    max: 40
+    max: 20
   conv3out:
-    min: 1
-    max: 500
+    min: 30
+    max: 200
   conv4h:
-    min: 1
-    max: 40
+    value: 5
   conv4w:
-    min: 1
-    max: 40
+    min: 9
+    max: 17
   conv4out:
     min: 1
-    max: 500
+    max: 200
   linear1out:
     min: 1
-    max: 500
+    max: 200
   linear1drop:
     distribution: uniform
     min: 0.0
