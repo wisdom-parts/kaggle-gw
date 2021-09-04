@@ -24,3 +24,4 @@ dependencies:
       - datargs
       - pycbc
       - wandb
+      - efficientnet_pytorch
