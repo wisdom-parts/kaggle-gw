@@ -12,7 +12,7 @@ metric:
   goal: minimize
 parameters:
   batch:
-    values: [256, 512, 768]
+    values: [150, 250, 350]
   lr:
     min: 0.00005
     max: 0.002
