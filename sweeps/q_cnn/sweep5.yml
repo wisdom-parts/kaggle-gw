@@ -36,8 +36,7 @@ parameters:
     min: 1
     max: 20
   conv3out:
-    min: [30, 100, 200, 300]
-    max: 200
+    values: [30, 100, 200, 300]
   conv4h:
     value: 5
   conv4w:
