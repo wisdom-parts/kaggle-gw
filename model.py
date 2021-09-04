@@ -8,11 +8,12 @@ from command_line import path_to_dir
 from models import train_model, ModelManager
 from models.q_cnn import QCnnHp
 from models.sig_rnn import SigRnnHp
+from models.q_resnet import QResnetHp
 
 
 @dataclass()
 class Args:
-    model: Union[QCnnHp, SigRnnHp] = arg(positional=True, help="which model to train")
+    model: Union[QCnnHp, SigRnnHp, QResnetHp] = arg(positional=True, help="which model to train")
     sources: List[Path] = arg(
         positional=True,
         help=(
