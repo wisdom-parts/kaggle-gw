@@ -15,26 +15,25 @@ from models import HyperParameters, ModelManager
 @argsclass(name="q_resnet")
 @dataclass
 class QResnetHp(HyperParameters):
-    batch_size: int = 64
+    batch: int = 64
     epochs: int = 100
     lr: float = 0.001
     dtype: torch.dtype = torch.float32
-    convbn1h = 5
-    convbn1w = 5
-    convbn2h = 5
-    convbn2w = 5
-    convbn3h = 3
-    convbn3w = 3
-    convskiph = 3
-    convskipw = 3
-    mp = 2
+    convbn1h: int = 5
+    convbn1w: int = 5
+    convbn2h: int = 5
+    convbn2w: int = 5
+    convbn3h: int = 3
+    convbn3w: int = 3
+    convskiph: int = 3
+    convskipw: int = 3
+    mp: int = 2
 
-    block1out = 128
-    block2out = 256
-    block3out = 512
-    block4out = 512
+    block1out: int = 128
+    block2out: int = 256
+    block3out: int = 512
+    block4out: int = 512
 
-    linear1in = block4out
     linear1out = 1
 
     @property
@@ -101,7 +100,7 @@ class CnnResnet(nn.Module):
         self.block4 = ResnetBlock(device, hp, self.hp.block3out, self.hp.block4out)
 
         self.linear1 = nn.Linear(
-            in_features=self.hp.linear1in,
+            in_features=self.hp.block4out,
             out_features=self.hp.linear1out,
         )
 
