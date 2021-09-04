@@ -29,14 +29,10 @@ class QResnetHp(HyperParameters):
     convskipw = 3
     mp = 2
 
-    in_channels = 3
     block1out = 128
     block2out = 256
     block3out = 512
     block4out = 512
-
-    avgpoolh = 2
-    avgpoolw = 8
 
     linear1in = block4out
     linear1out = 1
@@ -99,12 +95,11 @@ class CnnResnet(nn.Module):
         self.hp = hp
         self.device = device
 
-        self.block1 = ResnetBlock(device, hp, self.hp.in_channels, self.hp.block1out)
+        self.block1 = ResnetBlock(device, hp, N_SIGNALS, self.hp.block1out)
         self.block2 = ResnetBlock(device, hp, self.hp.block1out, self.hp.block2out)
         self.block3 = ResnetBlock(device, hp, self.hp.block2out, self.hp.block3out)
         self.block4 = ResnetBlock(device, hp, self.hp.block3out, self.hp.block4out)
 
-        self.avg_pool = nn.AvgPool2d((self.hp.avgpoolh, self.hp.avgpoolw))
         self.linear1 = nn.Linear(
             in_features=self.hp.linear1in,
             out_features=self.hp.linear1out,
@@ -119,8 +114,8 @@ class CnnResnet(nn.Module):
         out = self.block2.forward(out)
         out = self.block3.forward(out)
         out = self.block4.forward(out)
-        out = self.avg_pool(out)
-        out = torch.flatten(out, start_dim=1)
+        # Average across h and w, leaving (batch, channels)
+        out = torch.mean(out, dim=[2, 3])
         out = self.linear1(out)
         return out
 
