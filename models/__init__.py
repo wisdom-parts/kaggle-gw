@@ -104,8 +104,8 @@ class ModelManager(ABC):
             wandb.log(
                 {"train_pred": pred.detach().cpu().numpy(), "train_loss": loss.item()}
             )
-            if batch_num % 100 == 0:
-                i = batch_num * len(X)
+            if batch_num % 30 == 0:
+                i = (batch_num + 1) * len(X)
                 print(f"training loss: {loss.item():>7f}  [{i:>5d}/{num_examples:>5d}]")
 
     # noinspection PyCallingNonCallable
