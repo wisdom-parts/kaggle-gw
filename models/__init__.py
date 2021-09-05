@@ -74,6 +74,7 @@ def gw_train_and_test_datasets(
     return MyDatasets(gw, train, test)
 
 
+TRAIN_LOGGING_INTERVAL = 30
 SAMPLES_TO_CHECK = 300
 MAX_SAMPLES_PER_KEY = 6
 
@@ -91,6 +92,8 @@ class ModelManager(ABC):
         num_examples: int,
         optimizer: torch.optim.Optimizer,
     ):
+        model.train()
+        interval_train_loss = 0.0
         for batch_num, (X, y) in enumerate(dataloader):
 
             optimizer.zero_grad()
@@ -101,12 +104,16 @@ class ModelManager(ABC):
             loss.backward()
             optimizer.step()
 
-            wandb.log(
-                {"train_pred": pred.detach().cpu().numpy(), "train_loss": loss.item()}
-            )
-            if batch_num % 30 == 0:
-                i = (batch_num + 1) * len(X)
-                print(f"training loss: {loss.item():>7f}  [{i:>5d}/{num_examples:>5d}]")
+            interval_train_loss += loss.item()
+            if batch_num % TRAIN_LOGGING_INTERVAL == 0:
+                interval_batches_done = TRAIN_LOGGING_INTERVAL if batch_num > 0 else 1
+                interval_loss = interval_train_loss/interval_batches_done
+                num_done = (batch_num + 1) * len(X)
+                print(f"training loss: {interval_loss:>5f}  [{num_done:>6d}/{num_examples:>6d}]")
+                wandb.log(
+                    {"train_pred": pred.detach().cpu().numpy(), "train_loss": interval_loss}
+                )
+                interval_train_loss = 0.0
 
     # noinspection PyCallingNonCallable
     def _test(
@@ -116,6 +123,7 @@ class ModelManager(ABC):
         dataloader: DataLoader,
         num_examples: int,
     ):
+        model.eval()
         num_batches = len(dataloader)
         test_loss = 0.0
         correct = 0.0
