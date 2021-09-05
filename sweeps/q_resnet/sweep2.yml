@@ -1,0 +1,52 @@
+program: python
+command:
+  - ${program}
+  - -m
+  - model
+  - q_resnet
+  - ${args}
+  - /home/ec2-user/qtransform-10000
+method: bayes
+metric:
+  name: test_loss
+  goal: minimize
+parameters:
+  batch:
+    values: [64, 128, 256]
+  lr:
+    min: 0.0001
+    max: 0.005
+  epochs:
+    value: 5
+  convbn1h:
+    min: 1
+    max: 12
+  convbn1w:
+    min: 1
+    max: 12
+  convbn2h:
+    min: 1
+    max: 12
+  convbn2w:
+    min: 1
+    max: 12
+  convbn3h:
+    min: 3
+    max: 12
+  convbn3w:
+    min: 3
+    max: 12
+  convskiph:
+    min: 3
+    max: 12
+  convskipw:
+    min: 3
+    max: 12
+  block1out:
+    values: [32, 64, 128]
+  block2out:
+    values: [64, 128, 512]
+  block3out:
+    values: [64, 128, 512]
+  block4out:
+    values: [64, 128, 512]
