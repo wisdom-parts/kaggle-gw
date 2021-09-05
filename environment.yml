@@ -21,7 +21,7 @@ dependencies:
   - typeguard
   - pip
   - pip:
-      - datargs
+      - datargs==0.8.0
       - pycbc
       - wandb
       - efficientnet_pytorch

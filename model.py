@@ -14,7 +14,7 @@ from models.q_resnet import QResnetHp
 
 @dataclass()
 class Args:
-    model: Union[QCnnHp, SigRnnHp, QResnetHp QEfficientNetHP] = arg(positional=True, help="which model to train")
+    model: Union[QCnnHp, SigRnnHp, QResnetHp, QEfficientNetHP] = arg(positional=True, help="which model to train")
     sources: List[Path] = arg(
         positional=True,
         help=(
