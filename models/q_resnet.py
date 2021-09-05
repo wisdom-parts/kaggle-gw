@@ -12,6 +12,9 @@ import qtransform_params
 from gw_data import *
 from models import HyperParameters, ModelManager
 
+def to_odd(i: int) -> int:
+    return (i // 2) * 2 + 1
+
 @argsclass(name="q_resnet")
 @dataclass
 class QResnetHp(HyperParameters):
@@ -40,6 +43,17 @@ class QResnetHp(HyperParameters):
     def manager_class(self) -> Type[ModelManager]:
         return Manager
 
+    def __post_init__(self):
+        self.convbn1h = to_odd(self.convbn1h)
+        self.convbn1w = to_odd(self.convbn1w)
+        self.convbn2h = to_odd(self.convbn2h)
+        self.convbn2w = to_odd(self.convbn2w)
+        self.convbn3h = to_odd(self.convbn3h)
+        self.convbn3w = to_odd(self.convbn3w)
+        self.convskiph = to_odd(self.convskiph)
+        self.convskipw = to_odd(self.convskipw)
+
+
 class ConvBlock(nn.Module):
     def __init__(self, in_channels, out_channels, kernel_size, padding_size):
         super().__init__()
@@ -66,10 +80,10 @@ class ResnetBlock(nn.Module):
         super().__init__()
         self.hp = hp
         self.device = device
-        self.conv_bn1 = ConvBlock(in_channels, out_channels, (self.hp.convbn1h, self.hp.convbn1w), (self.hp.convbn1h // 2, self.hp.convbn1h // 2))
-        self.conv_bn2 = ConvBlock(out_channels, out_channels, (self.hp.convbn2h, self.hp.convbn2w), (self.hp.convbn2h // 2, self.hp.convbn2h // 2))
-        self.conv_bn3 = ConvBlock(out_channels, out_channels, (self.hp.convbn3h, self.hp.convbn3w), (self.hp.convbn3h // 2, self.hp.convbn3h // 2))
-        self.conv_skip = ConvBlock(in_channels, out_channels, (self.hp.convskiph, self.hp.convskipw), (self.hp.convskiph // 2, self.hp.convskiph // 2))
+        self.conv_bn1 = ConvBlock(in_channels, out_channels, (self.hp.convbn1h, self.hp.convbn1w), (self.hp.convbn1h // 2, self.hp.convbn1w // 2))
+        self.conv_bn2 = ConvBlock(out_channels, out_channels, (self.hp.convbn2h, self.hp.convbn2w), (self.hp.convbn2h // 2, self.hp.convbn2w // 2))
+        self.conv_bn3 = ConvBlock(out_channels, out_channels, (self.hp.convbn3h, self.hp.convbn3w), (self.hp.convbn3h // 2, self.hp.convbn3w // 2))
+        self.conv_skip = ConvBlock(in_channels, out_channels, (self.hp.convskiph, self.hp.convskipw), (self.hp.convskiph // 2, self.hp.convskipw // 2))
         self.activation = nn.ReLU()
         self.mp = nn.MaxPool2d((self.hp.mp, self.hp.mp))
 
