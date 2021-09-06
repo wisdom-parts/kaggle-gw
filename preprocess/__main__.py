@@ -7,6 +7,7 @@ from gw_data import *
 from gw_data import make_data_dirs
 from command_line import path_to_dir
 from preprocess import filter_sig, qtransform
+from pycbc.fft import backend_support
 
 ProcessFunction = Callable[[np.ndarray], np.ndarray]
 
@@ -44,6 +45,12 @@ def preprocess(
     dest: Path,
     num_train_examples: Optional[int],
 ):
+    fft_backends = backend_support.get_backend_names()
+    print(f"Available fft backends: {fft_backends}")
+    if "cuda" in fft_backends:
+        print("Using cuda.")
+        backend_support.set_backend(["cuda"])
+
     has_test_data = validate_source_dir(source)
 
     os.makedirs(dest, exist_ok=True)
