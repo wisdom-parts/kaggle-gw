@@ -121,7 +121,6 @@ class CnnResnet(nn.Module):
 
     def forward(self, x: Tensor) -> Tensor:
         batch_size = x.size()[0]
-        assert x.size()[1:] == qtransform_params.OUTPUT_SHAPE
         out = self.block1.forward(x)
         assert out.size()[:2] == (batch_size, self.hp.block1out)
         out = self.block2.forward(out)

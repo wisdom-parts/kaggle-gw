@@ -25,6 +25,9 @@ class QCnnHp(HyperParameters):
     batch: int = 64
     epochs: int = 100
     lr: float = 0.0003
+    freq_steps: int = 32
+    time_steps: int = 128
+    output_shape: tuple = (3, 32, 128)
     dtype: torch.dtype = torch.float32
 
     conv1h: int = 11
@@ -80,7 +83,7 @@ class QCnnHp(HyperParameters):
 class Cnn(nn.Module):
     """
     Applies a CNN to the output of preprocess qtransform and produces one logit as output.
-    input size: (batch_size, ) + preprocess.qtransform.OUTPUT_SHAPE
+    input size: (batch_size, ) + preprocess.qtransform.OUTPUT_SHAPE (called as hp.output_shape)
     output size: (batch_size, 1)
     """
 
@@ -99,8 +102,8 @@ class Cnn(nn.Module):
         self.mp1 = nn.MaxPool2d(
             kernel_size=(hp.mp1h, hp.mp1w),
         )
-        self.mp1_out_h = qtransform_params.FREQ_STEPS // self.hp.mp1h
-        self.mp1_out_w = qtransform_params.TIME_STEPS // self.hp.mp1w
+        self.mp1_out_h = hp.freq_steps // self.hp.mp1h
+        self.mp1_out_w = hp.time_steps // self.hp.mp1w
         self.bn1 = nn.BatchNorm2d(hp.conv1out)
 
         self.conv2 = nn.Conv2d(
@@ -166,16 +169,16 @@ class Cnn(nn.Module):
         self.linear_activation = nn.ReLU()
 
     def forward(self, x: Tensor) -> Tensor:
-        batch_size = x.size()[0] # x is 64, 3, 32, 128
-        assert x.size()[1:] == qtransform_params.OUTPUT_SHAPE
+        batch_size = x.size()[0]
+        assert x.size()[1:] == self.hp.output_shape
 
         out = self.conv1(x)
         assert out.size() == (
             batch_size,
             self.hp.conv1out,
-            qtransform_params.FREQ_STEPS,
-            qtransform_params.TIME_STEPS,
-        ) # (64, 20, 32, 128)
+            self.hp.freq_steps,
+            self.hp.time_steps,
+        )
 
         out = self.mp1(self.conv_activation(out)) # (64, 20, 16, 64)
         out = self.bn1(out)
@@ -186,7 +189,7 @@ class Cnn(nn.Module):
             self.mp1_out_w,
         )
 
-        out = self.conv2(out) # (64, 20, 16, 64)
+        out = self.conv2(out)
         assert out.size() == (
             batch_size,
             self.hp.conv2out,
@@ -218,7 +221,7 @@ class Cnn(nn.Module):
             self.hp.conv3out,
             self.mp3_out_h,
             self.mp3_out_w,
-        ) # 64, 128, 8, 32
+        )
 
         out = self.conv4(out)
         assert out.size() == (
