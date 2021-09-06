@@ -8,7 +8,7 @@ from gw_data import (
     SIGNAL_LEN,
 )
 from gw_processing import timeseries_from_signal, window_sigs
-from qtransform_params import FREQ_STEPS_DOUBLE_RES, TIME_STEPS_PER_SEC_DOUBLE_RES, OUTPUT_SHAPE_DOUBLE_RES
+from qtransform_params import FREQ_STEPS_64x256, TIME_STEPS_PER_SEC_64x256, OUTPUT_SHAPE_64x256
 
 
 def qtransform_sig(sig: np.ndarray) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
@@ -23,9 +23,9 @@ def qtransform_sig(sig: np.ndarray) -> Tuple[np.ndarray, np.ndarray, np.ndarray]
     # As of this writing, the return type for qtransform is incorrectly declared. (or inferred?)
     # noinspection PyTypeChecker
     result: Tuple[np.ndarray, np.ndarray, np.ndarray] = ts.qtransform(
-        delta_t=1.0 / TIME_STEPS_PER_SEC_DOUBLE_RES, frange=(30, 350), logfsteps=FREQ_STEPS_DOUBLE_RES
+        delta_t=1.0 / TIME_STEPS_PER_SEC_64x256, frange=(30, 350), logfsteps=FREQ_STEPS_64x256
     )
-    assert result[2].shape == OUTPUT_SHAPE_DOUBLE_RES[1:]
+    assert result[2].shape == OUTPUT_SHAPE_64x256[1:]
     return result
 
 
