@@ -73,6 +73,18 @@ def gw_train_and_test_datasets(
     train, test = random_split(gw, [num_train_examples, num_test_examples])
     return MyDatasets(gw, train, test)
 
+def derive_freq_and_time_steps(source: Path) -> Tuple:
+    """
+    :param source: path to the input directory of training data provided by user
+    :return: the shape of the input data.
+    """
+    assert Path(f"{source}/0/0/0/").isdir() is True, f"Please check the {source} path provided. It needs to have a directory such as ../0/0/0/"
+    p = Path(f"{source}/0/0/0/")
+    for child in p.iterdir():
+        first_file = child
+        break
+    input_file = np.load(first_file)
+    return input_file.shape
 
 TRAIN_LOGGING_INTERVAL = 30
 SAMPLES_TO_CHECK = 300
