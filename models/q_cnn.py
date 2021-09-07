@@ -169,7 +169,7 @@ class Cnn(nn.Module):
         batch_size = x.size()[0] # x is 64, 3, 32, 128
         assert x.size()[1:] == qtransform_params.OUTPUT_SHAPE
 
-        out = self.conv1(x)
+        out = self.bn1(self.conv1(x))
         assert out.size() == (
             batch_size,
             self.hp.conv1out,
@@ -178,7 +178,6 @@ class Cnn(nn.Module):
         ) # (64, 20, 32, 128)
 
         out = self.mp1(self.conv_activation(out)) # (64, 20, 16, 64)
-        out = self.bn1(out)
         assert out.size() == (
             batch_size,
             self.hp.conv1out,
@@ -186,7 +185,7 @@ class Cnn(nn.Module):
             self.mp1_out_w,
         )
 
-        out = self.conv2(out) # (64, 20, 16, 64)
+        out = self.bn2(self.conv2(out)) # (64, 20, 16, 64)
         assert out.size() == (
             batch_size,
             self.hp.conv2out,
@@ -195,7 +194,6 @@ class Cnn(nn.Module):
         )
 
         out = self.mp2(self.conv_activation(out)) # 64, 20, 8, 32
-        out = self.bn2(out)
         assert out.size() == (
             batch_size,
             self.hp.conv2out,
@@ -203,7 +201,7 @@ class Cnn(nn.Module):
             self.mp2_out_w,
         )
 
-        out = self.conv3(out)
+        out = self.bn3(self.conv3(out))
         assert out.size() == (
             batch_size,
             self.hp.conv3out,
@@ -212,7 +210,6 @@ class Cnn(nn.Module):
         )
 
         out = self.mp3(self.conv_activation(out))
-        out = self.bn3(out)
         assert out.size() == (
             batch_size,
             self.hp.conv3out,
@@ -220,7 +217,7 @@ class Cnn(nn.Module):
             self.mp3_out_w,
         ) # 64, 128, 8, 32
 
-        out = self.conv4(out)
+        out = self.bn4(self.conv4(out))
         assert out.size() == (
             batch_size,
             self.hp.conv4out,
@@ -232,7 +229,6 @@ class Cnn(nn.Module):
             out = self.conv_activation(out)
 
         out = self.mp4(out)
-        out = self.bn4(out)
         assert out.size() == (
             batch_size,
             self.hp.conv4out,
