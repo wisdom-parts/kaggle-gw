@@ -10,6 +10,9 @@ from torch import nn, Tensor
 import qtransform_params
 from gw_data import *
 from models import HyperParameters, ModelManager
+class RegressionHead(Enum):
+    LINEAR = auto()
+    AVG_LINEAR = auto()
 
 
 def to_odd(i: int) -> int:
@@ -43,6 +46,8 @@ class SigCnnHp(HyperParameters):
     conv4out: int = 10
     conv4stride: int = 1
     mp4w: int = 4
+
+    head: RegressionHead = RegressionHead.LINEAR
 
     lindrop: float = 0.5
 
@@ -132,11 +137,15 @@ class SigCnn(nn.Module):
             // hp.mp3w
             // hp.conv4stride
             // hp.mp4w
-        ) * hp.conv4out
+        )
         if self.outw == 0:
             raise ValueError("strides and maxpools took output width to zero")
         self.linear_dropout = nn.Dropout(hp.lindrop)
-        self.linear = nn.Linear(in_features=self.outw, out_features=1)
+        linear_in_features = hp.conv4out * (
+            self.outw if hp.head == RegressionHead.LINEAR
+            else 1
+        )
+        self.linear = nn.Linear(in_features=linear_in_features, out_features=1)
 
     def forward(self, x: Tensor) -> Tensor:
         batch_size = x.size()[0]
@@ -145,8 +154,13 @@ class SigCnn(nn.Module):
         out = self.conv2(out, use_activation=True)
         out = self.conv3(out, use_activation=True)
         out = self.conv4(out, use_activation=False)
-        out = torch.flatten(out, start_dim=1)
-        assert out.size() == (batch_size, self.outw)
+
+        if self.hp.head == RegressionHead.LINEAR:
+            out = torch.flatten(out, start_dim=1)
+        else:
+            assert self.hp.head == RegressionHead.AVG_LINEAR
+            # Average across w, leaving (batch, channels)
+            out = torch.mean(out, dim=2)
 
         out = self.linear_dropout(out)
         out = self.linear(out)
