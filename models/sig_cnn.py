@@ -44,6 +44,8 @@ class SigCnnHp(HyperParameters):
     conv4stride: int = 1
     mp4w: int = 4
 
+    lindrop: float = 0.5
+
     @property
     def manager_class(self) -> Type[ModelManager]:
         return Manager
@@ -67,14 +69,16 @@ class ConvBlock(nn.Module):
             stride=(stride,),
             padding=w // 2,
         )
-        self.mp = nn.MaxPool1d(kernel_size=mpw)
+        self.bn = nn.BatchNorm1d(out_channels)
         self.activation = nn.ReLU()
+        self.mp = nn.MaxPool1d(kernel_size=mpw)
 
     def forward(self, x: Tensor, use_activation: bool):
         out = self.conv(x)
-        out = self.mp(out)
+        out = self.bn(out)
         if use_activation:
             out = self.activation(out)
+        out = self.mp(out)
         return out
 
 
@@ -131,6 +135,7 @@ class SigCnn(nn.Module):
         ) * hp.conv4out
         if self.outw == 0:
             raise ValueError("strides and maxpools took output width to zero")
+        self.linear_dropout = nn.Dropout(hp.lindrop)
         self.linear = nn.Linear(in_features=self.outw, out_features=1)
 
     def forward(self, x: Tensor) -> Tensor:
@@ -143,6 +148,7 @@ class SigCnn(nn.Module):
         out = torch.flatten(out, start_dim=1)
         assert out.size() == (batch_size, self.outw)
 
+        out = self.linear_dropout(out)
         out = self.linear(out)
         assert out.size() == (batch_size, 1)
 
