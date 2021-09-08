@@ -248,9 +248,8 @@ class HyperParameters:
         :param source: path to the input directory of training data provided by user
         :return: the shape of the input data.
         """
-        p = Path(source)
         training_data = None
-        for child in p.glob('**/*'):
+        for child in source.glob('**/*'):
             if child.is_file() is True and child.name.endswith(".npy"):
                 training_data = child.absolute()
                 break
