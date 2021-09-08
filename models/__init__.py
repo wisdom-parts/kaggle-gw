@@ -73,19 +73,6 @@ def gw_train_and_test_datasets(
     train, test = random_split(gw, [num_train_examples, num_test_examples])
     return MyDatasets(gw, train, test)
 
-def derive_freq_and_time_steps(source: Path) -> Tuple:
-    """
-    :param source: path to the input directory of training data provided by user
-    :return: the shape of the input data.
-    """
-    assert Path(f"{source}/0/0/0/").isdir() is True, f"Please check the {source} path provided. It needs to have a directory such as ../0/0/0/"
-    p = Path(f"{source}/0/0/0/")
-    for child in p.iterdir():
-        first_file = child
-        break
-    input_file = np.load(first_file)
-    return input_file.shape
-
 TRAIN_LOGGING_INTERVAL = 30
 SAMPLES_TO_CHECK = 300
 MAX_SAMPLES_PER_KEY = 6
@@ -255,6 +242,21 @@ class HyperParameters:
     def manager_class(self) -> Type[ModelManager]:
         return ModelManager
 
+    @property
+    def find_input_dims(self, source: Path):
+        """
+        :param source: path to the input directory of training data provided by user
+        :return: the shape of the input data.
+        """
+        p = Path(source)
+        training_data = None
+        for child in p.glob('**/*'):
+            if child.is_file() is True and child.name.endswith(".npy"):
+                training_data = child.absolute()
+                break
+        assert training_data is not None, "Check to see if you have *.npy files in the training data"
+        input_file = np.load(training_data)
+        return input_file.shape
 
 def train_model(manager: ModelManager, sources: List[Path], hp: HyperParameters):
     for source in sources:
