@@ -6,7 +6,7 @@ from typing import Callable, Mapping, Optional, Set
 from gw_data import *
 from gw_data import make_data_dirs
 from command_line import path_to_dir
-from preprocess import filter_sig, qtransform
+from preprocessors import filter_sig, qtransform
 from pycbc.fft import backend_support
 
 ProcessFunction = Callable[[np.ndarray], np.ndarray]
