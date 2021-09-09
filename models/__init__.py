@@ -9,6 +9,7 @@ import torch
 import wandb
 from torch import Tensor, nn
 from torch.utils.data import Dataset, random_split, DataLoader, Subset
+from sklearn.metrics import roc_auc_score
 
 from gw_data import training_labels_file, train_file, validate_source_dir
 
@@ -146,11 +147,21 @@ class ModelManager(ABC):
         fn = 0.0
         tp = 0.0
         tn = 0.0
+        pred_all, y_all = None, None
 
         with torch.no_grad():
             for X, y in dataloader:
                 pred = model(X)
                 loss = loss_fn(pred, y)
+                if pred_all is not None:
+                    pred_all = np.append(pred_all, pred.cpu().data.numpy(), axis=0)
+                else:
+                    pred_all = pred.cpu().data.numpy()
+
+                if y_all is not None:
+                    y_all = np.append(y_all, y.cpu().data.numpy(), axis=0)
+                else:
+                    y_all = y.cpu().data.numpy()
 
                 test_loss += loss.item()
 
@@ -167,6 +178,7 @@ class ModelManager(ABC):
 
         test_loss /= num_batches
         test_accuracy = 100.0 * correct / num_examples
+        auc_score = roc_auc_score(y_all, pred_all)
         print(
             f"----\ntest metrics: Accuracy: {test_accuracy:>0.1f}%, Avg loss: {test_loss:>8f} \n"
         )
@@ -179,6 +191,7 @@ class ModelManager(ABC):
                 "FP": fp,
                 "TN": tn,
                 "FN": fn,
+                "AUC": auc_score,
                 "num_examples": num_examples,
             }
         )
