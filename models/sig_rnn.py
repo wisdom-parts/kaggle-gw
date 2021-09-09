@@ -98,10 +98,8 @@ class Rnn(nn.Module):
 
 
 class Manager(ModelManager):
-    def train(self, sources: List[Path], device: torch.device, hp: HyperParameters):
-        if len(sources) != 1:
-            raise ValueError("must have exactly one source; got {len(sources)}")
+    def train(self, data_dir: Path, device: torch.device, hp: HyperParameters):
         if not isinstance(hp, SigRnnHp):
             raise ValueError("wrong hyper-parameter class: {hp}")
         wandb.init(project="g2net-" + __name__, config=asdict(hp))
-        self._train(Rnn(device, hp), device, sources[0], hp)
+        self._train(Rnn(device, hp), device, data_dir, ["filter_sig"], hp)

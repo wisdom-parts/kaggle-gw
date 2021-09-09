@@ -12,8 +12,10 @@ import qtransform_params
 from gw_data import *
 from models import HyperParameters, ModelManager
 
+
 def to_odd(i: int) -> int:
     return (i // 2) * 2 + 1
+
 
 @argsclass(name="q_resnet")
 @dataclass
@@ -80,10 +82,30 @@ class ResnetBlock(nn.Module):
         super().__init__()
         self.hp = hp
         self.device = device
-        self.conv_bn1 = ConvBlock(in_channels, out_channels, (self.hp.convbn1h, self.hp.convbn1w), (self.hp.convbn1h // 2, self.hp.convbn1w // 2))
-        self.conv_bn2 = ConvBlock(out_channels, out_channels, (self.hp.convbn2h, self.hp.convbn2w), (self.hp.convbn2h // 2, self.hp.convbn2w // 2))
-        self.conv_bn3 = ConvBlock(out_channels, out_channels, (self.hp.convbn3h, self.hp.convbn3w), (self.hp.convbn3h // 2, self.hp.convbn3w // 2))
-        self.conv_skip = ConvBlock(in_channels, out_channels, (self.hp.convskiph, self.hp.convskipw), (self.hp.convskiph // 2, self.hp.convskipw // 2))
+        self.conv_bn1 = ConvBlock(
+            in_channels,
+            out_channels,
+            (self.hp.convbn1h, self.hp.convbn1w),
+            (self.hp.convbn1h // 2, self.hp.convbn1w // 2),
+        )
+        self.conv_bn2 = ConvBlock(
+            out_channels,
+            out_channels,
+            (self.hp.convbn2h, self.hp.convbn2w),
+            (self.hp.convbn2h // 2, self.hp.convbn2w // 2),
+        )
+        self.conv_bn3 = ConvBlock(
+            out_channels,
+            out_channels,
+            (self.hp.convbn3h, self.hp.convbn3w),
+            (self.hp.convbn3h // 2, self.hp.convbn3w // 2),
+        )
+        self.conv_skip = ConvBlock(
+            in_channels,
+            out_channels,
+            (self.hp.convskiph, self.hp.convskipw),
+            (self.hp.convskiph // 2, self.hp.convskipw // 2),
+        )
         self.activation = nn.ReLU()
         self.mp = nn.MaxPool2d((self.hp.mp, self.hp.mp))
 
@@ -118,7 +140,6 @@ class CnnResnet(nn.Module):
             out_features=self.hp.linear1out,
         )
 
-
     def forward(self, x: Tensor) -> Tensor:
         batch_size = x.size()[0]
         out = self.block1.forward(x)
@@ -133,11 +154,9 @@ class CnnResnet(nn.Module):
 
 
 class Manager(ModelManager):
-    def train(self, sources: List[Path], device: torch.device, hp: HyperParameters):
-        if len(sources) != 1:
-            raise ValueError("must have exactly one source; got {len(sources)}")
+    def train(self, data_dir: Path, device: torch.device, hp: HyperParameters):
         if not isinstance(hp, QResnetHp):
             raise ValueError("wrong hyper-parameter class: {hp}")
 
         wandb.init(project="g2net-" + __name__, entity="wisdom", config=asdict(hp))
-        self._train(CnnResnet(device, hp), device, sources[0], hp)
+        self._train(CnnResnet(device, hp), device, data_dir, ["qtransform"], hp)

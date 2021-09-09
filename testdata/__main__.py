@@ -7,7 +7,7 @@ import numpy as np
 from command_line import path_that_does_not_exist
 from gw_data import *
 from gw_data import make_data_dirs
-from preprocess import filter_sig
+from preprocessors import filter_sig
 
 # Yields random test data as a g2net (3, 4096) array and a boolean label.
 from testdata import nearby_ones

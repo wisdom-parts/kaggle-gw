@@ -1,0 +1,69 @@
+program: python
+command:
+  - ${program}
+  - -m
+  - model
+  - sig_cnn
+  - ${args}
+  - /home/ec2-user/filter_sig-40000
+method: bayes
+metric:
+  goal: minimize
+  name: test_loss
+parameters:
+  batch:
+    min: 30
+    max: 500
+  epochs:
+    value: 10
+  lr:
+    max: 0.001
+    min: 0.00005
+  conv1w:
+    max: 151
+    min: 1
+  conv1stride:
+    max: 2
+    min: 1
+  conv1out:
+    max: 200
+    min: 1
+  mp1w:
+    max: 2
+    min: 1
+  conv2w:
+    max: 15
+    min: 1
+  conv2stride:
+    max: 2
+    min: 1
+  conv2out:
+    max: 100
+    min: 1
+  mp2w:
+    max: 4
+    min: 1
+  conv3w:
+    max: 101
+    min: 1
+  conv3stride:
+    max: 2
+    min: 1
+  conv3out:
+    max: 100
+    min: 1
+  mp3w:
+    max: 4
+    min: 1
+  conv4w:
+    max: 71
+    min: 1
+  conv4stride:
+    max: 2
+    min: 1
+  conv4out:
+    max: 100
+    min: 1
+  mp4w:
+    max: 4
+    min: 1

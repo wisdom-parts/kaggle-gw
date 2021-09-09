@@ -15,34 +15,41 @@ from gw_data import training_labels_file, train_file, validate_source_dir
 
 class GwDataset(Dataset[Tuple[Tensor, Tensor]]):
     """
-    Represents the training examples of a g2net data directory as Tensor's
-    of size (N_SIGNALS, SIGNAL_LEN).
+    Represents the training examples of a g2net data directory as Tensors.
     """
 
     def __init__(
         self,
-        source: Path,
+        data_dir: Path,
+        data_names: List[str],
         transform: Callable[[np.ndarray], Tensor],
         target_transform: Callable[[int], Tensor],
     ):
-        self.source = source
+        if len(data_names) > 1:
+            raise ValueError("multiple data names not yet supported")
+        self.data_dir = data_dir
         self.transform = transform
         self.target_transform = target_transform
         self.ids: List[str] = []
         self.id_to_label: Dict[str, int] = {}
-        with open(training_labels_file(source)) as id_label_file:
+        with open(training_labels_file(data_dir)) as id_label_file:
             for id_label in id_label_file:
                 _id, label = id_label.split(",")
                 if _id != "id":
                     self.ids.append(_id)
                     self.id_to_label[_id] = int(label)
+        self.data_name = (
+            data_names[0]
+            if train_file(data_dir, self.ids[0], data_names[0]).exists()
+            else None
+        )
 
     def __len__(self):
         return len(self.ids)
 
     def __getitem__(self, idx: int) -> Tuple[Tensor, Tensor]:
         _id = self.ids[idx]
-        fpath = str(train_file(self.source, _id))
+        fpath = str(train_file(self.data_dir, _id, self.data_name))
 
         x = self.transform(np.load(fpath))
         y = self.target_transform(self.id_to_label[_id])
@@ -58,7 +65,7 @@ class MyDatasets:
 
 
 def gw_train_and_test_datasets(
-    source: Path, dtype: torch.dtype, device: torch.device
+    data_dir: Path, data_names: List[str], dtype: torch.dtype, device: torch.device
 ) -> MyDatasets:
     def transform(x: np.ndarray) -> torch.Tensor:
         return torch.tensor(x, dtype=dtype, device=device)
@@ -66,7 +73,9 @@ def gw_train_and_test_datasets(
     def target_transform(y: int) -> torch.Tensor:
         return torch.tensor((y,), dtype=dtype, device=device)
 
-    gw = GwDataset(source, transform=transform, target_transform=target_transform)
+    gw = GwDataset(
+        data_dir, data_names, transform=transform, target_transform=target_transform
+    )
     num_examples = len(gw)
     num_train_examples = int(num_examples * 0.8)
     num_test_examples = num_examples - num_train_examples
@@ -80,7 +89,7 @@ MAX_SAMPLES_PER_KEY = 6
 
 class ModelManager(ABC):
     @abstractmethod
-    def train(self, sources: List[Path], device: torch.device, hp: "HyperParameters"):
+    def train(self, data_dir: Path, device: torch.device, hp: "HyperParameters"):
         pass
 
     def _train_epoch(
@@ -106,11 +115,16 @@ class ModelManager(ABC):
             interval_train_loss += loss.item()
             if batch_num % TRAIN_LOGGING_INTERVAL == 0:
                 interval_batches_done = TRAIN_LOGGING_INTERVAL if batch_num > 0 else 1
-                interval_loss = interval_train_loss/interval_batches_done
+                interval_loss = interval_train_loss / interval_batches_done
                 num_done = (batch_num + 1) * len(X)
-                print(f"training loss: {interval_loss:>5f}  [{num_done:>6d}/{num_examples:>6d}]")
+                print(
+                    f"training loss: {interval_loss:>5f}  [{num_done:>6d}/{num_examples:>6d}]"
+                )
                 wandb.log(
-                    {"train_pred": pred.detach().cpu().numpy(), "train_loss": interval_loss}
+                    {
+                        "train_pred": pred.detach().cpu().numpy(),
+                        "train_loss": interval_loss,
+                    }
                 )
                 interval_train_loss = 0.0
 
@@ -141,7 +155,8 @@ class ModelManager(ABC):
 
                 correct += torch.sum(torch.eq(pred > 0.0, y > 0.0)).item()
 
-                zero_pred += torch.sum(pred == 0.0) # more than a few suggests a bug
+                # more than a few suggests a bug
+                zero_pred += torch.sum(pred == 0.0).item()
 
                 tp += torch.sum(torch.bitwise_and(pred > 0.0, y == 1)).item()
                 fp += torch.sum(torch.bitwise_and(pred > 0.0, y == 0)).item()
@@ -171,16 +186,15 @@ class ModelManager(ABC):
         self,
         model: nn.Module,
         device: torch.device,
-        source: Path,
+        data_dir: Path,
+        data_names: List[str],
         hp: "HyperParameters",
     ):
-        data = gw_train_and_test_datasets(source, hp.dtype, device)
+        data = gw_train_and_test_datasets(data_dir, data_names, hp.dtype, device)
         model.to(device, dtype=hp.dtype)
         loss_fn = nn.BCEWithLogitsLoss()
         wandb.watch(model, criterion=loss_fn, log="all", log_freq=100)
-        train_dataloader = DataLoader(
-            data.train, batch_size=hp.batch, shuffle=True
-        )
+        train_dataloader = DataLoader(data.train, batch_size=hp.batch, shuffle=True)
         test_dataloader = DataLoader(data.test, batch_size=hp.batch, shuffle=True)
         print(hp)
         optimizer = torch.optim.Adam(model.parameters(), lr=hp.lr)
@@ -242,27 +256,12 @@ class HyperParameters:
     def manager_class(self) -> Type[ModelManager]:
         return ModelManager
 
-    @property
-    def find_input_dims(self, source: Path):
-        """
-        :param source: path to the input directory of training data provided by user
-        :return: the shape of the input data.
-        """
-        training_data = None
-        for child in source.glob('**/*'):
-            if child.is_file() is True and child.name.endswith(".npy"):
-                training_data = child.absolute()
-                break
-        assert training_data is not None, "Check to see if you have *.npy files in the training data"
-        input_file = np.load(training_data)
-        return input_file.shape
 
-def train_model(manager: ModelManager, sources: List[Path], hp: HyperParameters):
-    for source in sources:
-        validate_source_dir(source)
+def train_model(manager: ModelManager, data_dir: Path, hp: HyperParameters):
+    validate_source_dir(data_dir)
 
     device_name = "cuda" if torch.cuda.is_available() else "cpu"
     print(f"Using device {device_name}")
     device = torch.device(device_name)
 
-    manager.train(sources, device, hp)
+    manager.train(data_dir, device, hp)
