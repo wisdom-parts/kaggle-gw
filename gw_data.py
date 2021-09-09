@@ -2,7 +2,7 @@ import os
 import random
 from pathlib import Path
 from string import hexdigits
-from typing import List
+from typing import List, Optional
 
 import numpy as np
 
@@ -38,24 +38,32 @@ def train_dir(data_dir: Path) -> Path:
     return data_dir / TRAIN_DIRNAME
 
 
-def relative_example_path(example_id: str):
+def relative_example_path(example_id: str, data_name: Optional[str] = None):
     """
     Returns the relative path from a train or test directory to the data file for the
-    given example_id.
+    given example_id and data_name.
     """
-    return Path(example_id[0]) / example_id[1] / example_id[2] / (example_id + ".npy")
+    prefix = data_name + "_" if data_name else ""
+    return (
+        Path(example_id[0])
+        / example_id[1]
+        / example_id[2]
+        / (prefix + example_id + ".npy")
+    )
 
 
-def train_file(data_dir: Path, example_id: str) -> Path:
-    return train_dir(data_dir) / relative_example_path(example_id)
+def train_file(
+    data_dir: Path, example_id: str, data_name: Optional[str] = None
+) -> Path:
+    return train_dir(data_dir) / relative_example_path(example_id, data_name)
 
 
 def test_dir(data_dir: Path) -> Path:
     return data_dir / TEST_DIRNAME
 
 
-def test_file(data_dir: Path, example_id: str) -> Path:
-    return test_dir(data_dir) / relative_example_path(example_id)
+def test_file(data_dir: Path, example_id: str, data_name: Optional[str] = None) -> Path:
+    return test_dir(data_dir) / relative_example_path(example_id, data_name)
 
 
 def validate_source_dir(source_dir: Path) -> bool:
