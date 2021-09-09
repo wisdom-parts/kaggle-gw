@@ -11,13 +11,16 @@ import qtransform_params
 from gw_data import *
 from models import HyperParameters, ModelManager
 
+
 class RegressionHead(Enum):
     LINEAR = auto()
     MAX = auto()
     AVG_LINEAR = auto()
 
+
 def to_odd(i: int) -> int:
     return (i // 2) * 2 + 1
+
 
 @argsclass(name="q_cnn")
 @dataclass
@@ -55,7 +58,7 @@ class QCnnHp(HyperParameters):
 
     head: RegressionHead = RegressionHead.LINEAR
 
-    linear1out: int = 10 # if this value is 1, then omit linear2
+    linear1out: int = 10  # if this value is 1, then omit linear2
     linear1drop: float = 0.5
 
     @property
@@ -74,7 +77,6 @@ class QCnnHp(HyperParameters):
 
         self.conv4h = to_odd(self.conv4h)
         self.conv4w = to_odd(self.conv4w)
-
 
 
 class Cnn(nn.Module):
@@ -148,7 +150,8 @@ class Cnn(nn.Module):
         self.conv_dropout = nn.Dropout(p=self.hp.convdrop)
 
         self.flattened_conv_features = (
-            hp.conv4out if hp.head == RegressionHead.AVG_LINEAR
+            hp.conv4out
+            if hp.head == RegressionHead.AVG_LINEAR
             else hp.conv4out * self.mp4_out_h * self.mp4_out_w
         )
 
@@ -166,7 +169,7 @@ class Cnn(nn.Module):
         self.linear_activation = nn.ReLU()
 
     def forward(self, x: Tensor) -> Tensor:
-        batch_size = x.size()[0] # x is 64, 3, 32, 128
+        batch_size = x.size()[0]  # x is 64, 3, 32, 128
         assert x.size()[1:] == qtransform_params.OUTPUT_SHAPE
 
         out = self.bn1(self.conv1(x))
@@ -175,9 +178,9 @@ class Cnn(nn.Module):
             self.hp.conv1out,
             qtransform_params.FREQ_STEPS,
             qtransform_params.TIME_STEPS,
-        ) # (64, 20, 32, 128)
+        )  # (64, 20, 32, 128)
 
-        out = self.mp1(self.conv_activation(out)) # (64, 20, 16, 64)
+        out = self.mp1(self.conv_activation(out))  # (64, 20, 16, 64)
         assert out.size() == (
             batch_size,
             self.hp.conv1out,
@@ -185,7 +188,7 @@ class Cnn(nn.Module):
             self.mp1_out_w,
         )
 
-        out = self.bn2(self.conv2(out)) # (64, 20, 16, 64)
+        out = self.bn2(self.conv2(out))  # (64, 20, 16, 64)
         assert out.size() == (
             batch_size,
             self.hp.conv2out,
@@ -193,7 +196,7 @@ class Cnn(nn.Module):
             self.mp1_out_w,
         )
 
-        out = self.mp2(self.conv_activation(out)) # 64, 20, 8, 32
+        out = self.mp2(self.conv_activation(out))  # 64, 20, 8, 32
         assert out.size() == (
             batch_size,
             self.hp.conv2out,
@@ -215,7 +218,7 @@ class Cnn(nn.Module):
             self.hp.conv3out,
             self.mp3_out_h,
             self.mp3_out_w,
-        ) # 64, 128, 8, 32
+        )  # 64, 128, 8, 32
 
         out = self.bn4(self.conv4(out))
         assert out.size() == (
@@ -246,10 +249,7 @@ class Cnn(nn.Module):
         if self.hp.convdrop > 0.0:
             out = self.conv_dropout(out)
 
-        assert out.size() == (
-            batch_size,
-            self.flattened_conv_features
-        )
+        assert out.size() == (batch_size, self.flattened_conv_features)
 
         if self.hp.head == RegressionHead.MAX:
             out = torch.amax(out, dim=1, keepdim=True)

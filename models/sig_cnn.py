@@ -10,6 +10,8 @@ from torch import nn, Tensor
 import qtransform_params
 from gw_data import *
 from models import HyperParameters, ModelManager
+
+
 class RegressionHead(Enum):
     LINEAR = auto()
     AVG_LINEAR = auto()
@@ -142,8 +144,7 @@ class SigCnn(nn.Module):
             raise ValueError("strides and maxpools took output width to zero")
         self.linear_dropout = nn.Dropout(hp.lindrop)
         linear_in_features = hp.conv4out * (
-            self.outw if hp.head == RegressionHead.LINEAR
-            else 1
+            self.outw if hp.head == RegressionHead.LINEAR else 1
         )
         self.linear = nn.Linear(in_features=linear_in_features, out_features=1)
 

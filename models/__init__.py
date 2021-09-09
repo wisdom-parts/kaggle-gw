@@ -107,11 +107,16 @@ class ModelManager(ABC):
             interval_train_loss += loss.item()
             if batch_num % TRAIN_LOGGING_INTERVAL == 0:
                 interval_batches_done = TRAIN_LOGGING_INTERVAL if batch_num > 0 else 1
-                interval_loss = interval_train_loss/interval_batches_done
+                interval_loss = interval_train_loss / interval_batches_done
                 num_done = (batch_num + 1) * len(X)
-                print(f"training loss: {interval_loss:>5f}  [{num_done:>6d}/{num_examples:>6d}]")
+                print(
+                    f"training loss: {interval_loss:>5f}  [{num_done:>6d}/{num_examples:>6d}]"
+                )
                 wandb.log(
-                    {"train_pred": pred.detach().cpu().numpy(), "train_loss": interval_loss}
+                    {
+                        "train_pred": pred.detach().cpu().numpy(),
+                        "train_loss": interval_loss,
+                    }
                 )
                 interval_train_loss = 0.0
 
@@ -142,7 +147,7 @@ class ModelManager(ABC):
 
                 correct += torch.sum(torch.eq(pred > 0.0, y > 0.0)).item()
 
-                zero_pred += torch.sum(pred == 0.0) # more than a few suggests a bug
+                zero_pred += torch.sum(pred == 0.0)  # more than a few suggests a bug
 
                 tp += torch.sum(torch.bitwise_and(pred > 0.0, y == 1)).item()
                 fp += torch.sum(torch.bitwise_and(pred > 0.0, y == 0)).item()
@@ -179,9 +184,7 @@ class ModelManager(ABC):
         model.to(device, dtype=hp.dtype)
         loss_fn = nn.BCEWithLogitsLoss()
         wandb.watch(model, criterion=loss_fn, log="all", log_freq=100)
-        train_dataloader = DataLoader(
-            data.train, batch_size=hp.batch, shuffle=True
-        )
+        train_dataloader = DataLoader(data.train, batch_size=hp.batch, shuffle=True)
         test_dataloader = DataLoader(data.test, batch_size=hp.batch, shuffle=True)
         print(hp)
         optimizer = torch.optim.Adam(model.parameters(), lr=hp.lr)

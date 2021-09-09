@@ -14,8 +14,9 @@ from models.sig_rnn import SigRnnHp
 
 @dataclass()
 class Args:
-    model: Union[SigRnnHp, SigCnnHp, QCnnHp, QResnetHp, QEfficientNetHP] = \
-        arg(positional=True, help="which model to train")
+    model: Union[SigRnnHp, SigCnnHp, QCnnHp, QResnetHp, QEfficientNetHP] = arg(
+        positional=True, help="which model to train"
+    )
     sources: List[Path] = arg(
         positional=True,
         help=(
