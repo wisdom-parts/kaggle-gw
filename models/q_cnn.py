@@ -1,6 +1,6 @@
 from dataclasses import dataclass, asdict
 from enum import Enum, auto
-from typing import Type
+from typing import Type, Tuple
 
 import torch
 import wandb
@@ -29,6 +29,8 @@ class QCnnHp(HyperParameters):
     epochs: int = 100
     lr: float = 0.0003
     dtype: torch.dtype = torch.float32
+
+    convlayers: int = 4
 
     conv1h: int = 11
     conv1w: int = 11
@@ -66,6 +68,11 @@ class QCnnHp(HyperParameters):
         return Manager
 
     def __post_init__(self):
+        if self.convlayers < 1 or self.convlayers > 4:
+            raise ValueError(
+                "convlayers must be between 1 and 4; was {self.convlayers}"
+            )
+
         self.conv1h = to_odd(self.conv1h)
         self.conv1w = to_odd(self.conv1w)
 
@@ -77,6 +84,43 @@ class QCnnHp(HyperParameters):
 
         self.conv4h = to_odd(self.conv4h)
         self.conv4w = to_odd(self.conv4w)
+
+
+class ConvBlock(nn.Module):
+    def __init__(self, in_channels, out_channels, kernel_size, stride, mp_size):
+        super().__init__()
+        self.mp_size = mp_size
+        self.stride = stride
+
+        if kernel_size[0] % 2 == 0 or kernel_size[1] % 2 == 0:
+            raise ValueError(f"mp_size must be odd; was {kernel_size}")
+        padding = (kernel_size[0] // 2, kernel_size[1] // 2)
+
+        self.conv = nn.Conv2d(
+            in_channels=in_channels,
+            out_channels=out_channels,
+            kernel_size=kernel_size,
+            stride=stride,
+            padding=padding,
+        )
+        self.mp = nn.MaxPool2d(mp_size) if mp_size[0] > 1 or mp_size[1] > 1 else None
+        self.bn = nn.BatchNorm2d(out_channels)
+        self.activation = nn.ReLU()
+
+    def forward(self, x, use_activation=False):
+        out = self.conv(x)
+        out = self.bn(out)
+        if use_activation is True:
+            out = self.activation(out)
+        if self.mp:
+            out = self.mp(out)
+        return out
+
+    def out_size(self, in_size: Tuple[int, int]) -> Tuple[int, int]:
+        def s(i: int) -> int:
+            return in_size[i] // self.mp_size[i] // self.stride[i]
+
+        return s(0), s(1)
 
 
 class Cnn(nn.Module):
@@ -91,68 +135,63 @@ class Cnn(nn.Module):
         self.hp = hp
         self.device = device
 
-        self.conv1 = nn.Conv2d(
-            in_channels=3,
+        self.cb1 = ConvBlock(
+            in_channels=N_SIGNALS,
             out_channels=hp.conv1out,
             kernel_size=(hp.conv1h, hp.conv1w),
             stride=(1, 1),
-            padding=(hp.conv1h // 2, hp.conv1w // 2),
+            mp_size=(hp.mp1h, hp.mp1w),
         )
-        self.mp1 = nn.MaxPool2d(
-            kernel_size=(hp.mp1h, hp.mp1w),
-        )
-        self.mp1_out_h = qtransform_params.FREQ_STEPS // self.hp.mp1h
-        self.mp1_out_w = qtransform_params.TIME_STEPS // self.hp.mp1w
-        self.bn1 = nn.BatchNorm2d(hp.conv1out)
 
-        self.conv2 = nn.Conv2d(
-            in_channels=hp.conv1out,
-            out_channels=hp.conv2out,
-            kernel_size=(hp.conv2h, hp.conv2w),
-            stride=(1, 1),
-            padding=(hp.conv2h // 2, hp.conv2w // 2),
+        self.conv_out_size = self.cb1.out_size(
+            (qtransform_params.FREQ_STEPS, qtransform_params.TIME_STEPS)
         )
-        self.mp2 = nn.MaxPool2d(
-            kernel_size=(hp.mp2h, hp.mp2w),
-        )
-        self.mp2_out_h = self.mp1_out_h // self.hp.mp2h
-        self.mp2_out_w = self.mp1_out_w // self.hp.mp2w
-        self.bn2 = nn.BatchNorm2d(hp.conv2out)
+        if hp.convlayers > 1:
+            self.cb2 = ConvBlock(
+                in_channels=hp.conv1out,
+                out_channels=hp.conv2out,
+                kernel_size=(hp.conv2h, hp.conv2w),
+                stride=(1, 1),
+                mp_size=(hp.mp2h, hp.mp2w),
+            )
+            self.conv_out_size = self.cb2.out_size(self.conv_out_size)
 
-        self.conv3 = nn.Conv2d(
-            in_channels=hp.conv2out,
-            out_channels=hp.conv3out,
-            kernel_size=(hp.conv3h, hp.conv3w),
-            stride=(1, 1),
-            padding=(hp.conv3h // 2, hp.conv3w // 2),
-        )
-        self.mp3 = nn.MaxPool2d(
-            kernel_size=(hp.mp3h, hp.mp3w),
-        )
-        self.mp3_out_h = self.mp2_out_h // self.hp.mp3h
-        self.mp3_out_w = self.mp2_out_w // self.hp.mp3w
-        self.bn3 = nn.BatchNorm2d(hp.conv3out)
+        if hp.convlayers > 2:
+            self.cb3 = ConvBlock(
+                in_channels=hp.conv2out,
+                out_channels=hp.conv3out,
+                kernel_size=(hp.conv3h, hp.conv3w),
+                stride=(1, 1),
+                mp_size=(hp.mp3h, hp.mp3w),
+            )
+            self.conv_out_size = self.cb3.out_size(self.conv_out_size)
 
-        self.conv4 = nn.Conv2d(
-            in_channels=hp.conv3out,
-            out_channels=hp.conv4out,
-            kernel_size=(hp.conv4h, hp.conv4w),
-            stride=(1, 1),
-            padding=(hp.conv4h // 2, hp.conv4w // 2),
-        )
-        self.mp4 = nn.MaxPool2d(
-            kernel_size=(hp.mp4h, hp.mp4w),
-        )
-        self.mp4_out_h = self.mp3_out_h // self.hp.mp4h
-        self.mp4_out_w = self.mp3_out_w // self.hp.mp4w
-        self.bn4 = nn.BatchNorm2d(hp.conv4out)
+        if hp.convlayers > 3:
+            self.cb4 = ConvBlock(
+                in_channels=hp.conv3out,
+                out_channels=hp.conv4out,
+                kernel_size=(hp.conv4h, hp.conv4w),
+                stride=(1, 1),
+                mp_size=(hp.mp4h, hp.mp4w),
+            )
+            self.conv_out_size = self.cb4.out_size(self.conv_out_size)
 
         self.conv_dropout = nn.Dropout(p=self.hp.convdrop)
 
-        self.flattened_conv_features = (
-            hp.conv4out
+        self.conv_out_features = (
+            hp.conv1out
+            if hp.convlayers == 1
+            else (
+                hp.conv2out
+                if hp.convlayers == 2
+                else (hp.conv3out if hp.convlayers == 3 else hp.conv4out)
+            )
+        )
+
+        self.flattened_conv_features = self.conv_out_features * (
+            1
             if hp.head == RegressionHead.AVG_LINEAR
-            else hp.conv4out * self.mp4_out_h * self.mp4_out_w
+            else self.conv_out_size[0] * self.conv_out_size[1]
         )
 
         self.linear1 = nn.Linear(
@@ -169,75 +208,23 @@ class Cnn(nn.Module):
         self.linear_activation = nn.ReLU()
 
     def forward(self, x: Tensor) -> Tensor:
-        batch_size = x.size()[0]  # x is 64, 3, 32, 128
-        assert x.size()[1:] == qtransform_params.OUTPUT_SHAPE
+        batch_size = x.size()[0]
 
-        out = self.bn1(self.conv1(x))
-        assert out.size() == (
-            batch_size,
-            self.hp.conv1out,
-            qtransform_params.FREQ_STEPS,
-            qtransform_params.TIME_STEPS,
-        )  # (64, 20, 32, 128)
+        final_conv_activation = self.hp.head == RegressionHead.LINEAR
 
-        out = self.mp1(self.conv_activation(out))  # (64, 20, 16, 64)
-        assert out.size() == (
-            batch_size,
-            self.hp.conv1out,
-            self.mp1_out_h,
-            self.mp1_out_w,
+        out = self.cb1(
+            x, use_activation=self.hp.convlayers > 1 or final_conv_activation
         )
-
-        out = self.bn2(self.conv2(out))  # (64, 20, 16, 64)
-        assert out.size() == (
-            batch_size,
-            self.hp.conv2out,
-            self.mp1_out_h,
-            self.mp1_out_w,
-        )
-
-        out = self.mp2(self.conv_activation(out))  # 64, 20, 8, 32
-        assert out.size() == (
-            batch_size,
-            self.hp.conv2out,
-            self.mp2_out_h,
-            self.mp2_out_w,
-        )
-
-        out = self.bn3(self.conv3(out))
-        assert out.size() == (
-            batch_size,
-            self.hp.conv3out,
-            self.mp2_out_h,
-            self.mp2_out_w,
-        )
-
-        out = self.mp3(self.conv_activation(out))
-        assert out.size() == (
-            batch_size,
-            self.hp.conv3out,
-            self.mp3_out_h,
-            self.mp3_out_w,
-        )  # 64, 128, 8, 32
-
-        out = self.bn4(self.conv4(out))
-        assert out.size() == (
-            batch_size,
-            self.hp.conv4out,
-            self.mp3_out_h,
-            self.mp3_out_w,
-        )
-
-        if self.hp.head == RegressionHead.LINEAR:
-            out = self.conv_activation(out)
-
-        out = self.mp4(out)
-        assert out.size() == (
-            batch_size,
-            self.hp.conv4out,
-            self.mp4_out_h,
-            self.mp4_out_w,
-        )
+        if self.hp.convlayers > 1:
+            out = self.cb2(
+                out, use_activation=self.hp.convlayers > 2 or final_conv_activation
+            )
+        if self.hp.convlayers > 2:
+            out = self.cb3(
+                out, use_activation=self.hp.convlayers > 3 or final_conv_activation
+            )
+        if self.hp.convlayers > 3:
+            out = self.cb4(out, use_activation=final_conv_activation)
 
         if self.hp.head == RegressionHead.AVG_LINEAR:
             # Average across h and w, leaving (batch, channels)
@@ -255,8 +242,6 @@ class Cnn(nn.Module):
             out = torch.amax(out, dim=1, keepdim=True)
         else:
             out = self.linear1(self.conv_activation(out))
-            assert out.size() == (batch_size, self.hp.linear1out)
-
             if self.hp.linear1out > 1:
                 out = self.linear_activation(out)
                 if self.hp.linear1drop > 0.0:
