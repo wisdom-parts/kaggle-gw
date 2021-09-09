@@ -171,11 +171,9 @@ class SigCnn(nn.Module):
 
 
 class Manager(ModelManager):
-    def train(self, sources: List[Path], device: torch.device, hp: HyperParameters):
-        if len(sources) != 1:
-            raise ValueError("must have exactly one source; got {len(sources)}")
+    def train(self, data_dir, device: torch.device, hp: HyperParameters):
         if not isinstance(hp, SigCnnHp):
             raise ValueError("wrong hyper-parameter class: {hp}")
 
         wandb.init(project="g2net-" + __name__, entity="wisdom", config=asdict(hp))
-        self._train(SigCnn(device, hp), device, sources[0], hp)
+        self._train(SigCnn(device, hp), device, data_dir, hp)

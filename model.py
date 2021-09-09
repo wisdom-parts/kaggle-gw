@@ -17,10 +17,10 @@ class Args:
     model: Union[SigRnnHp, SigCnnHp, QCnnHp, QResnetHp, QEfficientNetHP] = arg(
         positional=True, help="which model to train"
     )
-    sources: List[Path] = arg(
+    data_dir: Path = arg(
         positional=True,
         help=(
-            "directory(ies) containing the input dataset(s),"
+            "directory containing the input dataset(s),"
             " in the original g2net directory structure"
         ),
     )
@@ -29,4 +29,4 @@ class Args:
 if __name__ == "__main__":
     args = parse(Args)
     manager: ModelManager = args.model.manager_class()
-    train_model(manager, args.sources, args.model)
+    train_model(manager, args.data_dir, args.model)
