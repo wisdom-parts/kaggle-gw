@@ -147,7 +147,8 @@ class ModelManager(ABC):
 
                 correct += torch.sum(torch.eq(pred > 0.0, y > 0.0)).item()
 
-                zero_pred += torch.sum(pred == 0.0)  # more than a few suggests a bug
+                # more than a few suggests a bug
+                zero_pred += torch.sum(pred == 0.0).item()
 
                 tp += torch.sum(torch.bitwise_and(pred > 0.0, y == 1)).item()
                 fp += torch.sum(torch.bitwise_and(pred > 0.0, y == 0)).item()
