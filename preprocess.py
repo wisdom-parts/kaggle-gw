@@ -6,7 +6,7 @@ from typing import Callable, Mapping, Optional, Set
 from gw_data import *
 from gw_data import make_data_dirs
 from command_line import path_to_dir
-from preprocessors import filter_sig, qtransform
+from preprocessors import filter_sig, qtransform, qtransform_64x256
 from pycbc.fft import backend_support
 
 ProcessFunction = Callable[[np.ndarray], np.ndarray]
@@ -14,6 +14,7 @@ ProcessFunction = Callable[[np.ndarray], np.ndarray]
 processors: Mapping[str, ProcessFunction] = {
     "filter_sig": filter_sig.process,
     "qtransform": qtransform.process,
+    "qtransform_64x256": qtransform_64x256.process,
 }
 
 
