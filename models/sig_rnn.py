@@ -102,4 +102,4 @@ class Manager(ModelManager):
         if not isinstance(hp, SigRnnHp):
             raise ValueError("wrong hyper-parameter class: {hp}")
         wandb.init(project="g2net-" + __name__, config=asdict(hp))
-        self._train(Rnn(device, hp), device, data_dir, hp)
+        self._train(Rnn(device, hp), device, data_dir, ["filter_sig"], hp)

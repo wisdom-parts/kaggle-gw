@@ -15,34 +15,41 @@ from gw_data import training_labels_file, train_file, validate_source_dir
 
 class GwDataset(Dataset[Tuple[Tensor, Tensor]]):
     """
-    Represents the training examples of a g2net data directory as Tensor's
-    of size (N_SIGNALS, SIGNAL_LEN).
+    Represents the training examples of a g2net data directory as Tensors.
     """
 
     def __init__(
         self,
-        source: Path,
+        data_dir: Path,
+        data_names: List[str],
         transform: Callable[[np.ndarray], Tensor],
         target_transform: Callable[[int], Tensor],
     ):
-        self.source = source
+        if len(data_names) > 1:
+            raise ValueError("multiple data names not yet supported")
+        self.data_dir = data_dir
         self.transform = transform
         self.target_transform = target_transform
         self.ids: List[str] = []
         self.id_to_label: Dict[str, int] = {}
-        with open(training_labels_file(source)) as id_label_file:
+        with open(training_labels_file(data_dir)) as id_label_file:
             for id_label in id_label_file:
                 _id, label = id_label.split(",")
                 if _id != "id":
                     self.ids.append(_id)
                     self.id_to_label[_id] = int(label)
+        self.data_name = (
+            data_names[0]
+            if train_file(data_dir, self.ids[0], data_names[0]).exists()
+            else None
+        )
 
     def __len__(self):
         return len(self.ids)
 
     def __getitem__(self, idx: int) -> Tuple[Tensor, Tensor]:
         _id = self.ids[idx]
-        fpath = str(train_file(self.source, _id))
+        fpath = str(train_file(self.data_dir, _id, self.data_name))
 
         x = self.transform(np.load(fpath))
         y = self.target_transform(self.id_to_label[_id])
@@ -58,7 +65,7 @@ class MyDatasets:
 
 
 def gw_train_and_test_datasets(
-    data_dir: Path, dtype: torch.dtype, device: torch.device
+    data_dir: Path, data_names: List[str], dtype: torch.dtype, device: torch.device
 ) -> MyDatasets:
     def transform(x: np.ndarray) -> torch.Tensor:
         return torch.tensor(x, dtype=dtype, device=device)
@@ -66,7 +73,9 @@ def gw_train_and_test_datasets(
     def target_transform(y: int) -> torch.Tensor:
         return torch.tensor((y,), dtype=dtype, device=device)
 
-    gw = GwDataset(data_dir, transform=transform, target_transform=target_transform)
+    gw = GwDataset(
+        data_dir, data_names, transform=transform, target_transform=target_transform
+    )
     num_examples = len(gw)
     num_train_examples = int(num_examples * 0.8)
     num_test_examples = num_examples - num_train_examples
@@ -179,9 +188,10 @@ class ModelManager(ABC):
         model: nn.Module,
         device: torch.device,
         data_dir: Path,
+        data_names: List[str],
         hp: "HyperParameters",
     ):
-        data = gw_train_and_test_datasets(data_dir, hp.dtype, device)
+        data = gw_train_and_test_datasets(data_dir, data_names, hp.dtype, device)
         model.to(device, dtype=hp.dtype)
         loss_fn = nn.BCEWithLogitsLoss()
         wandb.watch(model, criterion=loss_fn, log="all", log_freq=100)
