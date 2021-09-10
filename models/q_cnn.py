@@ -1,6 +1,6 @@
 from dataclasses import dataclass, asdict
 from enum import Enum, auto
-from typing import Type, Tuple
+from typing import Type, Tuple, Union
 
 import torch
 import wandb
@@ -25,43 +25,43 @@ def to_odd(i: int) -> int:
 @argsclass(name="q_cnn")
 @dataclass
 class QCnnHp(HyperParameters):
-    batch: int = 64
-    epochs: int = 100
-    lr: float = 0.0003
+    batch: int = 512
+    epochs: int = 3
+    lr: float = 0.0005
     dtype: torch.dtype = torch.float32
 
     convlayers: int = 4
 
-    conv1h: int = 11
-    conv1w: int = 11
-    conv1out: int = 5
+    conv1h: int = 33
+    conv1w: int = 7
+    conv1out: int = 10
     mp1h: int = 2
     mp1w: int = 2
 
-    conv2h: int = 11
-    conv2w: int = 3
-    conv2out: int = 80
+    conv2h: int = 17
+    conv2w: int = 65
+    conv2out: int = 100
     mp2h: int = 2
     mp2w: int = 2
 
-    conv3h: int = 7
-    conv3w: int = 11
-    conv3out: int = 40
+    conv3h: int = 9
+    conv3w: int = 16
+    conv3out: int = 30
     mp3h: int = 2
     mp3w: int = 2
 
-    conv4h: int = 7
-    conv4w: int = 7
-    conv4out: int = 10
+    conv4h: int = 5
+    conv4w: int = 9
+    conv4out: int = 100
     mp4h: int = 2
     mp4w: int = 2
 
     convdrop: float = 0.5
 
-    head: RegressionHead = RegressionHead.LINEAR
+    head: RegressionHead = RegressionHead.MAX
 
-    linear1out: int = 10  # if this value is 1, then omit linear2
-    linear1drop: float = 0.5
+    linear1out: int = 50  # if this value is 1, then omit linear2
+    linear1drop: float = 0.4
 
     @property
     def manager_class(self) -> Type[ModelManager]:
@@ -125,15 +125,16 @@ class ConvBlock(nn.Module):
 
 class Cnn(nn.Module):
     """
-    Applies a CNN to the output of preprocess qtransform and produces one logit as output.
-    input size: (batch_size, ) + preprocess.qtransform.OUTPUT_SHAPE
-    output size: (batch_size, 1)
+    Applies a CNN to qtransform data and produces an output shaped like
+    (batch, channels, height, width). The size of the output depends on
+    hyper-parameters.
     """
 
-    def __init__(self, device: torch.device, hp: QCnnHp):
+    def __init__(self, device: torch.device, hp: QCnnHp, apply_final_activation: bool):
         super().__init__()
-        self.hp = hp
         self.device = device
+        self.hp = hp
+        self.apply_final_activation = apply_final_activation
 
         self.cb1 = ConvBlock(
             in_channels=N_SIGNALS,
@@ -188,68 +189,115 @@ class Cnn(nn.Module):
             )
         )
 
-        self.flattened_conv_features = self.conv_out_features * (
+        self.output_shape = (self.conv_out_features,) + self.conv_out_size
+
+    def forward(self, x: Tensor) -> Tensor:
+        out = self.cb1(
+            x, use_activation=self.hp.convlayers > 1 or self.apply_final_activation
+        )
+        if self.hp.convlayers > 1:
+            out = self.cb2(
+                out,
+                use_activation=self.hp.convlayers > 2 or self.apply_final_activation,
+            )
+        if self.hp.convlayers > 2:
+            out = self.cb3(
+                out,
+                use_activation=self.hp.convlayers > 3 or self.apply_final_activation,
+            )
+        if self.hp.convlayers > 3:
+            out = self.cb4(out, use_activation=self.apply_final_activation)
+        return out
+
+
+class MaxHead(nn.Module):
+    """
+    Consumes the output of Cnn (channel, h, w) with no final activation
+    and returns the maximum across all outputs for each example
+    to produce a single logit with no final activation.
+    """
+
+    apply_activation_before_input = False
+
+    def __init__(
+        self, device: torch.device, hp: QCnnHp, input_shape: Tuple[int, int, int]
+    ):
+        super().__init__()
+
+    # noinspection PyMethodMayBeStatic
+    def forward(self, x: Tensor) -> Tensor:
+        batch_size = x.size()[0]
+        out = torch.flatten(x, start_dim=1)
+        out = torch.amax(out, dim=1, keepdim=True)
+        assert out.size() == (batch_size, 1)
+        return out
+
+
+class LinearHead(nn.Module):
+    """
+    Consumes the output of Cnn (channel, h, w) with a final activation and
+    applies one or two linear layers to produce a single logit with no final activation.
+    If hp.head == RegressionHead.AVG_LINEAR, then this module first
+    takes the average across (h, w).
+    """
+
+    apply_activation_before_input = True
+
+    def __init__(
+        self, device: torch.device, hp: QCnnHp, input_shape: Tuple[int, int, int]
+    ):
+        super().__init__()
+        self.hp = hp
+
+        linear_input_features = input_shape[0] * (
             1
             if hp.head == RegressionHead.AVG_LINEAR
-            else self.conv_out_size[0] * self.conv_out_size[1]
+            else input_shape[1] * input_shape[2]
         )
 
         self.linear1 = nn.Linear(
-            in_features=self.flattened_conv_features,
+            in_features=linear_input_features,
             out_features=hp.linear1out,
         )
         self.lin1_dropout = nn.Dropout(p=self.hp.linear1drop)
 
-        self.linear2 = nn.Linear(
-            in_features=hp.linear1out,
-            out_features=1,
-        )
-        self.conv_activation = nn.ReLU()
-        self.linear_activation = nn.ReLU()
+        self.activation = nn.ReLU()
+        if hp.linear1out > 1:
+            self.bn = nn.BatchNorm2d(linear_input_features)
+            self.linear2 = nn.Linear(
+                in_features=hp.linear1out,
+                out_features=1,
+            )
 
     def forward(self, x: Tensor) -> Tensor:
         batch_size = x.size()[0]
 
-        final_conv_activation = self.hp.head == RegressionHead.LINEAR
-
-        out = self.cb1(
-            x, use_activation=self.hp.convlayers > 1 or final_conv_activation
-        )
-        if self.hp.convlayers > 1:
-            out = self.cb2(
-                out, use_activation=self.hp.convlayers > 2 or final_conv_activation
-            )
-        if self.hp.convlayers > 2:
-            out = self.cb3(
-                out, use_activation=self.hp.convlayers > 3 or final_conv_activation
-            )
-        if self.hp.convlayers > 3:
-            out = self.cb4(out, use_activation=final_conv_activation)
-
         if self.hp.head == RegressionHead.AVG_LINEAR:
             # Average across h and w, leaving (batch, channels)
-            out = torch.mean(out, dim=[2, 3])
+            out = torch.mean(x, dim=[2, 3])
         else:
-            # Keep (c, h, w) dimensions as input to linear or max.
-            out = torch.flatten(out, start_dim=1)
+            out = torch.flatten(x, start_dim=1)
 
-        if self.hp.convdrop > 0.0:
-            out = self.conv_dropout(out)
-
-        assert out.size() == (batch_size, self.flattened_conv_features)
-
-        if self.hp.head == RegressionHead.MAX:
-            out = torch.amax(out, dim=1, keepdim=True)
-        else:
-            out = self.linear1(self.conv_activation(out))
-            if self.hp.linear1out > 1:
-                out = self.linear_activation(out)
-                if self.hp.linear1drop > 0.0:
-                    out = self.lin1_dropout(out)
-                out = self.linear2(out)
+        out = self.linear1(out)
+        if self.hp.linear1out > 1:
+            out = self.bn(out)
+            out = self.activation(out)
+            if self.hp.linear1drop > 0.0:
+                out = self.lin1_dropout(out)
+            out = self.linear2(out)
 
         assert out.size() == (batch_size, 1)
         return out
+
+
+class Model(nn.Module):
+    def __init__(self, cnn: nn.Module, head: nn.Module):
+        super().__init__()
+        self.cnn = cnn
+        self.head = head
+
+    def forward(self, x: Tensor) -> Tensor:
+        return self.head(self.cnn(x))
 
 
 class Manager(ModelManager):
@@ -258,4 +306,12 @@ class Manager(ModelManager):
             raise ValueError("wrong hyper-parameter class: {hp}")
 
         wandb.init(project="g2net-" + __name__, entity="wisdom", config=asdict(hp))
-        self._train(Cnn(device, hp), device, data_dir, ["qtransform"], hp)
+
+        head_class: Union[Type[MaxHead], Type[LinearHead]] = (
+            MaxHead if hp.head == RegressionHead.MAX else LinearHead
+        )
+        cnn = Cnn(device, hp, head_class.apply_activation_before_input)
+        head = head_class(device, hp, cnn.output_shape)
+        model = Model(cnn, head)
+
+        self._train(model, device, data_dir, ["qtransform"], hp)

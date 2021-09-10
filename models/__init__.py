@@ -133,6 +133,7 @@ class ModelManager(ABC):
     # noinspection PyCallingNonCallable
     def _test(
         self,
+        epoch,
         model: nn.Module,
         loss_fn: Callable[[Tensor, Tensor], Tensor],
         dataloader: DataLoader,
@@ -184,6 +185,7 @@ class ModelManager(ABC):
         )
         wandb.log(
             {
+                "epoch": epoch,
                 "test_loss": test_loss,
                 "test_accuracy": test_accuracy,
                 "zero_pred": zero_pred,
@@ -217,7 +219,7 @@ class ModelManager(ABC):
             self._train_epoch(
                 model, loss_fn, train_dataloader, len(data.train), optimizer
             )
-            self._test(model, loss_fn, test_dataloader, len(data.test))
+            self._test(epoch, model, loss_fn, test_dataloader, len(data.test))
 
         confusion_sample_indices = (
             random.sample(data.test.indices, SAMPLES_TO_CHECK)
