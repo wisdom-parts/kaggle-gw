@@ -8,8 +8,8 @@ command:
   - /home/ec2-user/qtransform-40000
 method: bayes
 metric:
-  name: test_loss
-  goal: minimize
+  name: AUC
+  goal: maximize
 parameters:
   batch:
     value: 512

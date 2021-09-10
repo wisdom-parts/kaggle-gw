@@ -263,7 +263,7 @@ class LinearHead(nn.Module):
 
         self.activation = nn.ReLU()
         if hp.linear1out > 1:
-            self.bn = nn.BatchNorm2d(linear_input_features)
+            self.bn = nn.BatchNorm1d(hp.linear1out)
             self.linear2 = nn.Linear(
                 in_features=hp.linear1out,
                 out_features=1,
