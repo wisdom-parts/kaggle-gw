@@ -58,9 +58,8 @@ def preprocess(
 
     all_ids = read_first_column(training_labels_file(source))
 
-    chosen_ids = set(
-        random.sample(all_ids, num_train_examples) if num_train_examples else all_ids
-    )
+    num_ids = num_train_examples or len(all_ids)
+    chosen_ids = set(all_ids[0:num_ids])
 
     with open(training_labels_file(source)) as training_labels_in:
         with open(training_labels_file(dest), "w") as training_labels_out:
