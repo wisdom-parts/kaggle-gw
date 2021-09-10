@@ -28,4 +28,5 @@ dependencies:
       - pycbc
       - wandb
       - efficientnet_pytorch
+      - scikit-learn
       - scikit-cuda
