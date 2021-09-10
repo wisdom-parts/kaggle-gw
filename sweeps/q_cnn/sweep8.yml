@@ -14,8 +14,7 @@ parameters:
   batch:
     value: 512
   lr:
-    min: 0.0001
-    max: 0.001
+    value: 0.001
   epochs:
     value: 10
   conv1h:
