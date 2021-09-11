@@ -9,6 +9,7 @@ from torch import nn, Tensor
 
 from gw_data import *
 from models import ModelManager, HyperParameters
+from preprocessor_meta import Preprocessor, filter_sig_meta
 
 
 class RnnType(Enum):
@@ -102,4 +103,4 @@ class Manager(ModelManager):
         if not isinstance(hp, SigRnnHp):
             raise ValueError("wrong hyper-parameter class: {hp}")
         wandb.init(project="g2net-" + __name__, config=asdict(hp))
-        self._train(Rnn(device, hp), device, data_dir, ["filter_sig"], hp)
+        self._train(Rnn(device, hp), device, data_dir, [filter_sig_meta], hp)

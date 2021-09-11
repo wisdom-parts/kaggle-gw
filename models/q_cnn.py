@@ -7,8 +7,9 @@ import wandb
 from datargs import argsclass
 from torch import nn, Tensor
 
-import qtransform_params
+import preprocessor_meta
 from gw_data import *
+from preprocessor_meta import Preprocessor
 from models import HyperParameters, ModelManager
 
 
@@ -29,6 +30,8 @@ class QCnnHp(HyperParameters):
     epochs: int = 3
     lr: float = 0.0005
     dtype: torch.dtype = torch.float32
+
+    preprocessor: Preprocessor = Preprocessor.QTRANSFORM
 
     convlayers: int = 4
 
@@ -144,9 +147,11 @@ class Cnn(nn.Module):
             mp_size=(hp.mp1h, hp.mp1w),
         )
 
-        self.conv_out_size = self.cb1.out_size(
-            (qtransform_params.FREQ_STEPS, qtransform_params.TIME_STEPS)
+        in_size: Tuple[int, int] = (
+            hp.preprocessor.value.output_shape[1],
+            hp.preprocessor.value.output_shape[2],
         )
+        self.conv_out_size = self.cb1.out_size(in_size)
         if hp.convlayers > 1:
             self.cb2 = ConvBlock(
                 in_channels=hp.conv1out,
@@ -314,4 +319,4 @@ class Manager(ModelManager):
         head = head_class(device, hp, cnn.output_shape)
         model = Model(cnn, head)
 
-        self._train(model, device, data_dir, ["qtransform"], hp)
+        self._train(model, device, data_dir, [hp.preprocessor.value], hp)

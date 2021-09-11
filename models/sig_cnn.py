@@ -7,7 +7,7 @@ import wandb
 from datargs import argsclass
 from torch import nn, Tensor
 
-import qtransform_params
+from preprocessor_meta import Preprocessor, filter_sig_meta
 from gw_data import *
 from models import HyperParameters, ModelManager
 
@@ -176,4 +176,4 @@ class Manager(ModelManager):
             raise ValueError("wrong hyper-parameter class: {hp}")
 
         wandb.init(project="g2net-" + __name__, entity="wisdom", config=asdict(hp))
-        self._train(SigCnn(device, hp), device, data_dir, ["filter_sig"], hp)
+        self._train(SigCnn(device, hp), device, data_dir, [filter_sig_meta], hp)

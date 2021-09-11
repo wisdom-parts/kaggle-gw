@@ -8,7 +8,7 @@ import efficientnet_pytorch
 from datargs import argsclass
 from torch import nn, Tensor
 
-import qtransform_params
+from preprocessor_meta import Preprocessor, qtransform_meta
 from gw_data import *
 from models import HyperParameters, ModelManager
 
@@ -42,8 +42,7 @@ class EfficientNet(nn.Module):
         self.net._fc = nn.Linear(in_features=n_features, out_features=1, bias=True)
 
     def forward(self, x: Tensor) -> Tensor:
-        batch_size = x.size()[0]  # x is 64, 3, 32, 128
-        assert x.size()[1:] == qtransform_params.OUTPUT_SHAPE
+        assert x.size()[1:] == qtransform_meta.output_shape
         out = self.net(x)
         return out
 
@@ -54,4 +53,4 @@ class Manager(ModelManager):
             raise ValueError("wrong hyper-parameter class: {hp}")
 
         wandb.init(project="g2net-" + __name__, entity="wisdom", config=asdict(hp))
-        self._train(EfficientNet(device, hp), device, data_dir, ["qtransform"], hp)
+        self._train(EfficientNet(device, hp), device, data_dir, [qtransform_meta], hp)
