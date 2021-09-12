@@ -99,8 +99,14 @@ class Rnn(nn.Module):
 
 
 class Manager(ModelManager):
-    def train(self, data_dir: Path, device: torch.device, hp: HyperParameters):
+    def train(
+        self,
+        data_dir: Path,
+        n: Optional[int],
+        device: torch.device,
+        hp: HyperParameters,
+    ):
         if not isinstance(hp, SigRnnHp):
             raise ValueError("wrong hyper-parameter class: {hp}")
         wandb.init(project="g2net-" + __name__, config=asdict(hp))
-        self._train(Rnn(device, hp), device, data_dir, [filter_sig_meta], hp)
+        self._train(Rnn(device, hp), device, data_dir, n, [filter_sig_meta], hp)
