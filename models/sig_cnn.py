@@ -24,34 +24,34 @@ def to_odd(i: int) -> int:
 @argsclass(name="sig_cnn")
 @dataclass
 class SigCnnHp(HyperParameters):
-    batch: int = 128
-    epochs: int = 100
+    batch: int = 512
+    epochs: int = 10
     lr: float = 0.0003
     dtype: torch.dtype = torch.float32
 
-    conv1w: int = 33
-    conv1out: int = 50
+    conv1w: int = 105
+    conv1out: int = 150
     conv1stride: int = 1
     mp1w: int = 1
 
-    conv2w: int = 33
-    conv2out: int = 50
+    conv2w: int = 8
+    conv2out: int = 40
     conv2stride: int = 1
-    mp2w: int = 2
+    mp2w: int = 4
 
-    conv3w: int = 33
+    conv3w: int = 8
     conv3out: int = 50
     conv3stride: int = 1
-    mp3w: int = 2
+    mp3w: int = 1
 
     conv4w: int = 33
-    conv4out: int = 10
+    conv4out: int = 50
     conv4stride: int = 1
-    mp4w: int = 4
+    mp4w: int = 3
 
-    head: RegressionHead = RegressionHead.LINEAR
+    head: RegressionHead = RegressionHead.AVG_LINEAR
 
-    lindrop: float = 0.5
+    lindrop: float = 0.22
 
     @property
     def manager_class(self) -> Type[ModelManager]:
