@@ -21,7 +21,7 @@ processors: Mapping[str, ProcessFunction] = {
 
 
 def preprocess_train_or_test(
-    process_fun: ProcessFunction,
+    process_fn: ProcessFunction,
     source: Path,
     source_data_name: Optional[str],
     dest: Path,
@@ -40,7 +40,7 @@ def preprocess_train_or_test(
         source_path = relative_example_path(example_id, source_data_name)
         x = np.load(str(source / source_path))
         dest_path = relative_example_path(example_id, dest_data_name)
-        np.save(str(dest / dest_path), process_fun(x))
+        np.save(str(dest / dest_path), process_fn(x))
         count += 1
         if count % 100 == 0:
             print(f"{datetime.datetime.now()}: processed {count} rows")
@@ -49,7 +49,7 @@ def preprocess_train_or_test(
 
 
 def preprocess(
-    process_fun: ProcessFunction,
+    process_fn: ProcessFunction,
     source: Path,
     source_data_name: Optional[str],
     dest: Path,
@@ -79,7 +79,7 @@ def preprocess(
                     training_labels_out.write(line)
 
     preprocess_train_or_test(
-        process_fun,
+        process_fn,
         source=train_dir(source),
         source_data_name=source_data_name,
         dest=train_dir(dest),
@@ -91,7 +91,7 @@ def preprocess(
         shutil.copy(sample_submission_file(source), sample_submission_file(dest))
         all_ids = read_first_column(sample_submission_file(source))
         preprocess_train_or_test(
-            process_fun,
+            process_fn,
             source=test_dir(source),
             source_data_name=source_data_name,
             dest=test_dir(dest),
