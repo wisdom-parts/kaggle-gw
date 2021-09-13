@@ -1,6 +1,7 @@
 import random
 from abc import abstractmethod, ABC
 from dataclasses import dataclass
+from enum import Enum, auto
 from pathlib import Path
 from typing import Optional, Callable, List, Dict, Tuple, Type
 
@@ -12,6 +13,7 @@ from torch.utils.data import Dataset, random_split, DataLoader, Subset
 from sklearn.metrics import roc_auc_score
 
 from gw_data import training_labels_file, train_file, validate_source_dir, DATA_VERSION
+from models.q_cnn import QCnnHp
 from preprocessor_meta import PreprocessorMeta
 
 
@@ -304,3 +306,93 @@ def train_model(
     device = torch.device(device_name)
 
     manager.train(data_dir, n, device, hp)
+
+
+class RegressionHead2d(Enum):
+    LINEAR = auto()
+    MAX = auto()
+    AVG_LINEAR = auto()
+
+
+def to_odd(i: int) -> int:
+    return (i // 2) * 2 + 1
+
+
+class MaxHead(nn.Module):
+    """
+    Consumes the output of Cnn (channel, h, w) with no final activation
+    and returns the maximum across all outputs for each example
+    to produce a single logit with no final activation.
+    """
+
+    apply_activation_before_input = False
+
+    def __init__(
+        self, device: torch.device, hp: QCnnHp, input_shape: Tuple[int, int, int]
+    ):
+        super().__init__()
+
+    # noinspection PyMethodMayBeStatic
+    def forward(self, x: Tensor) -> Tensor:
+        batch_size = x.size()[0]
+        out = torch.flatten(x, start_dim=1)
+        out = torch.amax(out, dim=1, keepdim=True)
+        assert out.size() == (batch_size, 1)
+        return out
+
+
+class LinearHead(nn.Module):
+    """
+    Consumes the output of Cnn (channel, h, w) with a final activation and
+    applies one or two linear layers to produce a single logit with no final activation.
+    If hp.head == RegressionHead.AVG_LINEAR, then this module first
+    takes the average across (h, w).
+    """
+
+    apply_activation_before_input = True
+
+    def __init__(
+        self, device: torch.device, hp: QCnnHp, input_shape: Tuple[int, int, int]
+    ):
+        super().__init__()
+        self.hp = hp
+
+        linear_input_features = input_shape[0] * (
+            1
+            if hp.head == RegressionHead2d.AVG_LINEAR
+            else input_shape[1] * input_shape[2]
+        )
+
+        self.linear1 = nn.Linear(
+            in_features=linear_input_features,
+            out_features=hp.linear1out,
+        )
+        self.lin1_dropout = nn.Dropout(p=self.hp.linear1drop)
+
+        self.activation = nn.ReLU()
+        if hp.linear1out > 1:
+            self.bn = nn.BatchNorm1d(hp.linear1out)
+            self.linear2 = nn.Linear(
+                in_features=hp.linear1out,
+                out_features=1,
+            )
+
+    def forward(self, x: Tensor) -> Tensor:
+        batch_size = x.size()[0]
+
+        if self.hp.head == RegressionHead2d.AVG_LINEAR:
+            # Average across h and w, leaving (batch, channels)
+            out = torch.mean(x, dim=[2, 3])
+        else:
+            out = torch.flatten(x, start_dim=1)
+
+        out = self.linear1(out)
+        if self.hp.linear1out > 1:
+            out = self.bn(out)
+            out = self.activation(out)
+            if self.hp.linear1drop > 0.0:
+                out = self.lin1_dropout(out)
+            out = self.linear2(out)
+
+        assert out.size() == (batch_size, 1)
+        return out

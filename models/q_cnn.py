@@ -1,5 +1,4 @@
 from dataclasses import dataclass, asdict
-from enum import Enum, auto
 from typing import Type, Tuple, Union
 
 import torch
@@ -9,17 +8,14 @@ from torch import nn, Tensor
 
 from gw_data import *
 from preprocessor_meta import Preprocessor, PreprocessorMeta
-from models import HyperParameters, ModelManager
-
-
-class RegressionHead(Enum):
-    LINEAR = auto()
-    MAX = auto()
-    AVG_LINEAR = auto()
-
-
-def to_odd(i: int) -> int:
-    return (i // 2) * 2 + 1
+from models import (
+    HyperParameters,
+    ModelManager,
+    RegressionHead2d,
+    to_odd,
+    MaxHead,
+    LinearHead,
+)
 
 
 @argsclass(name="q_cnn")
@@ -68,7 +64,7 @@ class QCnnHp(HyperParameters):
 
     convdrop: float = 0.5
 
-    head: RegressionHead = RegressionHead.MAX
+    head: RegressionHead2d = RegressionHead2d.MAX
 
     linear1out: int = 50  # if this value is 1, then omit linear2
     linear1drop: float = 0.4
@@ -224,86 +220,6 @@ class Cnn(nn.Module):
         return out
 
 
-class MaxHead(nn.Module):
-    """
-    Consumes the output of Cnn (channel, h, w) with no final activation
-    and returns the maximum across all outputs for each example
-    to produce a single logit with no final activation.
-    """
-
-    apply_activation_before_input = False
-
-    def __init__(
-        self, device: torch.device, hp: QCnnHp, input_shape: Tuple[int, int, int]
-    ):
-        super().__init__()
-
-    # noinspection PyMethodMayBeStatic
-    def forward(self, x: Tensor) -> Tensor:
-        batch_size = x.size()[0]
-        out = torch.flatten(x, start_dim=1)
-        out = torch.amax(out, dim=1, keepdim=True)
-        assert out.size() == (batch_size, 1)
-        return out
-
-
-class LinearHead(nn.Module):
-    """
-    Consumes the output of Cnn (channel, h, w) with a final activation and
-    applies one or two linear layers to produce a single logit with no final activation.
-    If hp.head == RegressionHead.AVG_LINEAR, then this module first
-    takes the average across (h, w).
-    """
-
-    apply_activation_before_input = True
-
-    def __init__(
-        self, device: torch.device, hp: QCnnHp, input_shape: Tuple[int, int, int]
-    ):
-        super().__init__()
-        self.hp = hp
-
-        linear_input_features = input_shape[0] * (
-            1
-            if hp.head == RegressionHead.AVG_LINEAR
-            else input_shape[1] * input_shape[2]
-        )
-
-        self.linear1 = nn.Linear(
-            in_features=linear_input_features,
-            out_features=hp.linear1out,
-        )
-        self.lin1_dropout = nn.Dropout(p=self.hp.linear1drop)
-
-        self.activation = nn.ReLU()
-        if hp.linear1out > 1:
-            self.bn = nn.BatchNorm1d(hp.linear1out)
-            self.linear2 = nn.Linear(
-                in_features=hp.linear1out,
-                out_features=1,
-            )
-
-    def forward(self, x: Tensor) -> Tensor:
-        batch_size = x.size()[0]
-
-        if self.hp.head == RegressionHead.AVG_LINEAR:
-            # Average across h and w, leaving (batch, channels)
-            out = torch.mean(x, dim=[2, 3])
-        else:
-            out = torch.flatten(x, start_dim=1)
-
-        out = self.linear1(out)
-        if self.hp.linear1out > 1:
-            out = self.bn(out)
-            out = self.activation(out)
-            if self.hp.linear1drop > 0.0:
-                out = self.lin1_dropout(out)
-            out = self.linear2(out)
-
-        assert out.size() == (batch_size, 1)
-        return out
-
-
 class Model(nn.Module):
     def __init__(self, cnn: nn.Module, head: nn.Module):
         super().__init__()
@@ -328,7 +244,7 @@ class Manager(ModelManager):
         wandb.init(project="g2net-" + __name__, entity="wisdom", config=asdict(hp))
 
         head_class: Union[Type[MaxHead], Type[LinearHead]] = (
-            MaxHead if hp.head == RegressionHead.MAX else LinearHead
+            MaxHead if hp.head == RegressionHead2d.MAX else LinearHead
         )
         cnn = Cnn(device, hp, head_class.apply_activation_before_input)
         head = head_class(device, hp, cnn.output_shape)
