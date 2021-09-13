@@ -7,7 +7,7 @@ import wandb
 from datargs import argsclass
 from torch import nn, Tensor
 
-import qtransform_params
+from preprocessor_meta import Preprocessor, filter_sig_meta
 from gw_data import *
 from models import HyperParameters, ModelManager
 
@@ -24,34 +24,34 @@ def to_odd(i: int) -> int:
 @argsclass(name="sig_cnn")
 @dataclass
 class SigCnnHp(HyperParameters):
-    batch: int = 128
-    epochs: int = 100
+    batch: int = 512
+    epochs: int = 10
     lr: float = 0.0003
     dtype: torch.dtype = torch.float32
 
-    conv1w: int = 33
-    conv1out: int = 50
+    conv1w: int = 105
+    conv1out: int = 150
     conv1stride: int = 1
     mp1w: int = 1
 
-    conv2w: int = 33
-    conv2out: int = 50
+    conv2w: int = 8
+    conv2out: int = 40
     conv2stride: int = 1
-    mp2w: int = 2
+    mp2w: int = 4
 
-    conv3w: int = 33
+    conv3w: int = 8
     conv3out: int = 50
     conv3stride: int = 1
-    mp3w: int = 2
+    mp3w: int = 1
 
     conv4w: int = 33
-    conv4out: int = 10
+    conv4out: int = 50
     conv4stride: int = 1
-    mp4w: int = 4
+    mp4w: int = 3
 
-    head: RegressionHead = RegressionHead.LINEAR
+    head: RegressionHead = RegressionHead.AVG_LINEAR
 
-    lindrop: float = 0.5
+    lindrop: float = 0.22
 
     @property
     def manager_class(self) -> Type[ModelManager]:
@@ -171,9 +171,15 @@ class SigCnn(nn.Module):
 
 
 class Manager(ModelManager):
-    def train(self, data_dir, device: torch.device, hp: HyperParameters):
+    def train(
+        self,
+        data_dir: Path,
+        n: Optional[int],
+        device: torch.device,
+        hp: HyperParameters,
+    ):
         if not isinstance(hp, SigCnnHp):
             raise ValueError("wrong hyper-parameter class: {hp}")
 
         wandb.init(project="g2net-" + __name__, entity="wisdom", config=asdict(hp))
-        self._train(SigCnn(device, hp), device, data_dir, ["filter_sig"], hp)
+        self._train(SigCnn(device, hp), device, data_dir, n, [filter_sig_meta], hp)

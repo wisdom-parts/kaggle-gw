@@ -92,4 +92,4 @@ def make_data_dirs(train_or_test_dir: Path):
     for i in hex_low:
         for j in hex_low:
             for k in hex_low:
-                (train_or_test_dir / i / j / k).mkdir(parents=True)
+                (train_or_test_dir / i / j / k).mkdir(parents=True, exist_ok=True)

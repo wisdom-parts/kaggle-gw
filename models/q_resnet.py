@@ -1,6 +1,4 @@
-import pdb
 from dataclasses import dataclass, asdict
-from enum import Enum, auto
 from typing import Type
 
 import torch
@@ -8,9 +6,9 @@ import wandb
 from datargs import argsclass
 from torch import nn, Tensor
 
-import qtransform_params
 from gw_data import *
 from models import HyperParameters, ModelManager
+from preprocessor_meta import Preprocessor, qtransform_meta
 
 
 def to_odd(i: int) -> int:
@@ -142,7 +140,7 @@ class CnnResnet(nn.Module):
 
     def forward(self, x: Tensor) -> Tensor:
         batch_size = x.size()[0]
-        assert x.size()[1:] == qtransform_params.OUTPUT_SHAPE
+        assert x.size()[1:] == qtransform_meta.output_shape
         out = self.block1.forward(x)
         assert out.size()[:2] == (batch_size, self.hp.block1out)
         out = self.block2.forward(out)
@@ -155,9 +153,15 @@ class CnnResnet(nn.Module):
 
 
 class Manager(ModelManager):
-    def train(self, data_dir: Path, device: torch.device, hp: HyperParameters):
+    def train(
+        self,
+        data_dir: Path,
+        n: Optional[int],
+        device: torch.device,
+        hp: HyperParameters,
+    ):
         if not isinstance(hp, QResnetHp):
             raise ValueError("wrong hyper-parameter class: {hp}")
 
         wandb.init(project="g2net-" + __name__, entity="wisdom", config=asdict(hp))
-        self._train(CnnResnet(device, hp), device, data_dir, ["qtransform"], hp)
+        self._train(CnnResnet(device, hp), device, data_dir, n, [qtransform_meta], hp)

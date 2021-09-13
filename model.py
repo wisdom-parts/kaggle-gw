@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Union, List
+from typing import Union, Optional
 
 from datargs import arg, parse
 
@@ -12,7 +12,7 @@ from models.sig_cnn import SigCnnHp
 from models.sig_rnn import SigRnnHp
 
 
-@dataclass()
+@dataclass
 class Args:
     model: Union[SigRnnHp, SigCnnHp, QCnnHp, QResnetHp, QEfficientNetHP] = arg(
         positional=True, help="which model to train"
@@ -24,9 +24,14 @@ class Args:
             " in the original g2net directory structure"
         ),
     )
+    n: Optional[int] = arg(
+        aliases=["-n"],
+        default=None,
+        help="number of training examples to use",
+    )
 
 
 if __name__ == "__main__":
     args = parse(Args)
     manager: ModelManager = args.model.manager_class()
-    train_model(manager, args.data_dir, args.model)
+    train_model(manager, args.data_dir, args.n, args.model)

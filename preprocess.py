@@ -1,25 +1,32 @@
 import argparse
 import datetime
 import shutil
-from typing import Callable, Mapping, Optional, Set
+from typing import Callable, Mapping, Set
 
+from pycbc.fft import backend_support
+
+from command_line import path_to_dir
 from gw_data import *
 from gw_data import make_data_dirs
-from command_line import path_to_dir
-from preprocessors import filter_sig, qtransform, qtransform_64x256
-from pycbc.fft import backend_support
+from preprocessors import filter_sig, qtransform
 
 ProcessFunction = Callable[[np.ndarray], np.ndarray]
 
 processors: Mapping[str, ProcessFunction] = {
     "filter_sig": filter_sig.process,
-    "qtransform": qtransform.process,
-    "qtransform_64x256": qtransform_64x256.process,
+    "qtransform": qtransform.process_original,
+    "qtransform_64x256": qtransform.process_64x256,
+    "cp": lambda x: x,
 }
 
 
 def preprocess_train_or_test(
-    processor: ProcessFunction, source: Path, dest: Path, ids_to_process: Set[str]
+    process_fun: ProcessFunction,
+    source: Path,
+    source_data_name: Optional[str],
+    dest: Path,
+    dest_data_name: str,
+    ids_to_process: Set[str],
 ):
     print("======================")
     print(f"Preprocessing {source} -> {dest}")
@@ -30,9 +37,10 @@ def preprocess_train_or_test(
 
     count = 0
     for example_id in ids_to_process:
-        example_path = relative_example_path(example_id)
-        x = np.load(str(source / example_path))
-        np.save(str(dest / example_path), processor(x))
+        source_path = relative_example_path(example_id, source_data_name)
+        x = np.load(str(source / source_path))
+        dest_path = relative_example_path(example_id, dest_data_name)
+        np.save(str(dest / dest_path), process_fun(x))
         count += 1
         if count % 100 == 0:
             print(f"{datetime.datetime.now()}: processed {count} rows")
@@ -41,9 +49,11 @@ def preprocess_train_or_test(
 
 
 def preprocess(
-    processor: ProcessFunction,
+    process_fun: ProcessFunction,
     source: Path,
+    source_data_name: Optional[str],
     dest: Path,
+    dest_data_name: str,
     num_train_examples: Optional[int],
 ):
     fft_backends = backend_support.get_backend_names()
@@ -69,9 +79,11 @@ def preprocess(
                     training_labels_out.write(line)
 
     preprocess_train_or_test(
-        processor,
+        process_fun,
         source=train_dir(source),
+        source_data_name=source_data_name,
         dest=train_dir(dest),
+        dest_data_name=dest_data_name,
         ids_to_process=chosen_ids,
     )
 
@@ -79,9 +91,11 @@ def preprocess(
         shutil.copy(sample_submission_file(source), sample_submission_file(dest))
         all_ids = read_first_column(sample_submission_file(source))
         preprocess_train_or_test(
-            processor,
+            process_fun,
             source=test_dir(source),
+            source_data_name=source_data_name,
             dest=test_dir(dest),
+            dest_data_name=dest_data_name,
             ids_to_process=set(all_ids),
         )
 
@@ -104,6 +118,16 @@ if __name__ == "__main__":
         type=int,
     )
     arg_parser.add_argument(
+        "--from",
+        dest="source_data_name",
+        help="source data name (just for cp, otherwise ignored)",
+    )
+    arg_parser.add_argument(
+        "--to",
+        dest="dest_data_name",
+        help="destination data name (just for cp, otherwise ignored)",
+    )
+    arg_parser.add_argument(
         "processor", help="which processor to run", choices=processors.keys()
     )
     arg_parser.add_argument(
@@ -117,4 +141,11 @@ if __name__ == "__main__":
         type=Path,
     )
     args = arg_parser.parse_args()
-    preprocess(processors[args.processor], args.source, args.dest, args.n)
+    preprocess(
+        processors[args.processor],
+        args.source,
+        args.source_data_name if args.processor == "cp" else None,
+        args.dest,
+        args.dest_data_name if args.processor == "cp" else args.processor,
+        args.n,
+    )

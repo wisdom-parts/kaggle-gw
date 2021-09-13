@@ -1,40 +1,59 @@
-from typing import Tuple
+from typing import Tuple, cast
 
 import numpy as np
-import torch
 
 from gw_data import (
     N_SIGNALS,
     SIGNAL_LEN,
+    SIGNAL_SECS,
 )
 from gw_processing import timeseries_from_signal, window_sigs
-from qtransform_params import FREQ_STEPS, TIME_STEPS_PER_SEC, OUTPUT_SHAPE
+from preprocessor_meta import Preprocessor, qtransform_meta, qtransform_64x256_meta
 
 
-def qtransform_sig(sig: np.ndarray) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+def qtransform_sig(
+    sig: np.ndarray, output_shape: Tuple[int, int]
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     """
     Performs a qtransform on sig, returning
-    * times (numpy.ndarray) – The time that the qtransform is sampled.
+    * times (numpy.ndarray) – The times that the qtransform is sampled.
     * freqs (numpy.ndarray) – The frequencies that the qtransform is sampled.
-    * qplane (numpy.ndarray (2d)) – The two dimensional interpolated qtransform of this time series.
+    * qplane (numpy.ndarray (2d)) – The two dimensional interpolated qtransform of this time series,
+    *        in the specified output_shape representing (freqs, times)
     """
     ts = timeseries_from_signal(window_sigs(sig))
 
     # As of this writing, the return type for qtransform is incorrectly declared. (or inferred?)
     # noinspection PyTypeChecker
     result: Tuple[np.ndarray, np.ndarray, np.ndarray] = ts.qtransform(
-        delta_t=1.0 / TIME_STEPS_PER_SEC, frange=(30, 350), logfsteps=FREQ_STEPS
+        delta_t=SIGNAL_SECS / output_shape[1],
+        frange=(30, 350),
+        logfsteps=output_shape[0],
     )
-    assert result[2].shape == OUTPUT_SHAPE[1:]
+    assert result[2].shape == output_shape
     return result
 
 
-def process_sig(sig: np.ndarray) -> np.ndarray:
-    _, _, result = qtransform_sig(sig)
+def process_sig(sig: np.ndarray, output_shape: Tuple[int, int]) -> np.ndarray:
+    _, _, result = qtransform_sig(sig, output_shape)
     return (result - np.mean(result)) / np.std(result)
 
 
-def process(sigs: np.ndarray) -> np.ndarray:
+def process_given_shape(
+    sigs: np.ndarray, output_shape: Tuple[int, int, int]
+) -> np.ndarray:
     if sigs.shape != (N_SIGNALS, SIGNAL_LEN):
         raise ValueError(f"unexpected sigs shape: {sigs.shape}")
-    return np.stack([process_sig(sig) for sig in sigs])
+    return np.stack([process_sig(sig, output_shape[1:]) for sig in sigs])
+
+
+def process_original(sigs: np.ndarray) -> np.ndarray:
+    return process_given_shape(
+        sigs, cast(Tuple[int, int, int], qtransform_meta.output_shape)
+    )
+
+
+def process_64x256(sigs: np.ndarray) -> np.ndarray:
+    return process_given_shape(
+        sigs, cast(Tuple[int, int, int], qtransform_64x256_meta.output_shape)
+    )

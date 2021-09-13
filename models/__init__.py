@@ -12,6 +12,7 @@ from torch.utils.data import Dataset, random_split, DataLoader, Subset
 from sklearn.metrics import roc_auc_score
 
 from gw_data import training_labels_file, train_file, validate_source_dir
+from preprocessor_meta import PreprocessorMeta
 
 
 class GwDataset(Dataset[Tuple[Tensor, Tensor]]):
@@ -22,11 +23,12 @@ class GwDataset(Dataset[Tuple[Tensor, Tensor]]):
     def __init__(
         self,
         data_dir: Path,
-        data_names: List[str],
+        n: Optional[int],
+        preprocessors: List[PreprocessorMeta],
         transform: Callable[[np.ndarray], Tensor],
         target_transform: Callable[[int], Tensor],
     ):
-        if len(data_names) > 1:
+        if len(preprocessors) > 1:
             raise ValueError("multiple data names not yet supported")
         self.data_dir = data_dir
         self.transform = transform
@@ -39,9 +41,12 @@ class GwDataset(Dataset[Tuple[Tensor, Tensor]]):
                 if _id != "id":
                     self.ids.append(_id)
                     self.id_to_label[_id] = int(label)
+                    if n and len(self.ids) >= n:
+                        break
+        preprocessor_name = preprocessors[0].name
         self.data_name = (
-            data_names[0]
-            if train_file(data_dir, self.ids[0], data_names[0]).exists()
+            preprocessor_name
+            if train_file(data_dir, self.ids[0], preprocessor_name).exists()
             else None
         )
 
@@ -66,7 +71,11 @@ class MyDatasets:
 
 
 def gw_train_and_test_datasets(
-    data_dir: Path, data_names: List[str], dtype: torch.dtype, device: torch.device
+    data_dir: Path,
+    n: Optional[int],
+    preprocessors: List[PreprocessorMeta],
+    dtype: torch.dtype,
+    device: torch.device,
 ) -> MyDatasets:
     def transform(x: np.ndarray) -> torch.Tensor:
         return torch.tensor(x, dtype=dtype, device=device)
@@ -75,7 +84,11 @@ def gw_train_and_test_datasets(
         return torch.tensor((y,), dtype=dtype, device=device)
 
     gw = GwDataset(
-        data_dir, data_names, transform=transform, target_transform=target_transform
+        data_dir,
+        n,
+        preprocessors,
+        transform=transform,
+        target_transform=target_transform,
     )
     num_examples = len(gw)
     num_train_examples = int(num_examples * 0.8)
@@ -91,7 +104,13 @@ MAX_SAMPLES_PER_KEY = 6
 
 class ModelManager(ABC):
     @abstractmethod
-    def train(self, data_dir: Path, device: torch.device, hp: "HyperParameters"):
+    def train(
+        self,
+        data_dir: Path,
+        n: Optional[int],
+        device: torch.device,
+        hp: "HyperParameters",
+    ):
         pass
 
     def _train_epoch(
@@ -203,10 +222,11 @@ class ModelManager(ABC):
         model: nn.Module,
         device: torch.device,
         data_dir: Path,
-        data_names: List[str],
+        n: Optional[int],
+        preprocessors: List[PreprocessorMeta],
         hp: "HyperParameters",
     ):
-        data = gw_train_and_test_datasets(data_dir, data_names, hp.dtype, device)
+        data = gw_train_and_test_datasets(data_dir, n, preprocessors, hp.dtype, device)
         model.to(device, dtype=hp.dtype)
         loss_fn = nn.BCEWithLogitsLoss()
         wandb.watch(model, criterion=loss_fn, log="all", log_freq=100)
@@ -273,11 +293,13 @@ class HyperParameters:
         return ModelManager
 
 
-def train_model(manager: ModelManager, data_dir: Path, hp: HyperParameters):
+def train_model(
+    manager: ModelManager, data_dir: Path, n: Optional[int], hp: HyperParameters
+):
     validate_source_dir(data_dir)
 
     device_name = "cuda" if torch.cuda.is_available() else "cpu"
     print(f"Using device {device_name}")
     device = torch.device(device_name)
 
-    manager.train(data_dir, device, hp)
+    manager.train(data_dir, n, device, hp)
