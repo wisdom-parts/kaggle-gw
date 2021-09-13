@@ -1,0 +1,61 @@
+program: python
+command:
+  - ${program}
+  - -m
+  - model
+  - -n
+  - 100000
+  - q_cnn
+  - ${args}
+  - /home/ec2-user/data-all
+method: bayes
+metric:
+  name: AUC
+  goal: maximize
+parameters:
+  batch:
+    value: 512
+  lr:
+    value: 0.001
+  epochs:
+    value: 10
+  head:
+    values: [LINEAR, MAX, AVG_LINEAR]
+  conv1stridew:
+    min: 1
+    max: 3
+  conv2w:
+    values: [9, 17, 33, 49, 65]
+  conv2stridew:
+    min: 1
+    max: 3
+  mp1w:
+    min: 1
+    max: 2
+  mp2w:
+    min: 1
+    max: 2
+  mp3w:
+    min: 1
+    max: 2
+  mp4w:
+    min: 1
+    max: 2
+  conv1strideh:
+    min: 1
+    max: 2
+  conv2strideh:
+    min: 1
+    max: 2
+  mp1h:
+    min: 1
+    max: 2
+  mp2h:
+    min: 1
+    max: 2
+  mp3h:
+    min: 1
+    max: 2
+  mp4h:
+    min: 1
+    max: 2
