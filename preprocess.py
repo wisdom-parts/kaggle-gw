@@ -8,7 +8,7 @@ from pycbc.fft import backend_support
 from command_line import path_to_dir
 from gw_data import *
 from gw_data import make_data_dirs
-from preprocessors import filter_sig, qtransform
+from preprocessors import filter_sig, qtransform, correlation
 
 ProcessFunction = Callable[[np.ndarray], np.ndarray]
 
@@ -16,6 +16,7 @@ processors: Mapping[str, ProcessFunction] = {
     "filter_sig": filter_sig.process,
     "qtransform": qtransform.process_original,
     "qtransform_64x256": qtransform.process_64x256,
+    "correlation": correlation.process,
     "cp": lambda x: x,
 }
 
@@ -71,12 +72,19 @@ def preprocess(
     num_ids = num_train_examples or len(all_ids)
     chosen_ids = set(all_ids[0:num_ids])
 
-    with open(training_labels_file(source)) as training_labels_in:
-        with open(training_labels_file(dest), "w") as training_labels_out:
-            for line in training_labels_in:
-                example_id = line.split(",")[0]
-                if example_id == "id" or example_id in chosen_ids:
-                    training_labels_out.write(line)
+    if training_labels_file(dest).exists():
+        existing_ids = set(read_first_column(training_labels_file(dest)))
+        if chosen_ids != existing_ids:
+            print(
+                "Tried to process a different set of training example ids than already exists in {dest}"
+            )
+    else:
+        with open(training_labels_file(source)) as training_labels_in:
+            with open(training_labels_file(dest), "w") as training_labels_out:
+                for line in training_labels_in:
+                    example_id = line.split(",")[0]
+                    if example_id == "id" or example_id in chosen_ids:
+                        training_labels_out.write(line)
 
     preprocess_train_or_test(
         process_fn,
@@ -88,7 +96,10 @@ def preprocess(
     )
 
     if has_test_data and not num_train_examples:
-        shutil.copy(sample_submission_file(source), sample_submission_file(dest))
+        dest_sample_submission = sample_submission_file(dest)
+        if not dest_sample_submission.exists():
+            shutil.copy(sample_submission_file(source), dest_sample_submission)
+
         all_ids = read_first_column(sample_submission_file(source))
         preprocess_train_or_test(
             process_fn,
@@ -141,10 +152,15 @@ if __name__ == "__main__":
         type=Path,
     )
     args = arg_parser.parse_args()
+    source_data_name = (
+        args.source_data_name
+        if args.processor == "cp"
+        else ("filter_sig" if args.processor == "correlation" else None)
+    )
     preprocess(
         processors[args.processor],
         args.source,
-        args.source_data_name if args.processor == "cp" else None,
+        source_data_name,
         args.dest,
         args.dest_data_name if args.processor == "cp" else args.processor,
         args.n,
