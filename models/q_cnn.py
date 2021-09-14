@@ -7,9 +7,8 @@ import wandb
 from datargs import argsclass
 from torch import nn, Tensor
 
-import preprocessor_meta
 from gw_data import *
-from preprocessor_meta import Preprocessor
+from preprocessor_meta import Preprocessor, PreprocessorMeta
 from models import HyperParameters, ModelManager
 
 
@@ -139,8 +138,10 @@ class Cnn(nn.Module):
         self.hp = hp
         self.apply_final_activation = apply_final_activation
 
+        preprocessor_meta: PreprocessorMeta = hp.preprocessor.value
+
         self.cb1 = ConvBlock(
-            in_channels=N_SIGNALS,
+            in_channels=preprocessor_meta.output_shape[0],
             out_channels=hp.conv1out,
             kernel_size=(hp.conv1h, hp.conv1w),
             stride=(1, 1),
