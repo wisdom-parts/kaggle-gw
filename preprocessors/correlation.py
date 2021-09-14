@@ -1,15 +1,9 @@
-from math import ceil
-from typing import cast
+from typing import cast, List
 
 import numpy as np
 from numpy.linalg import norm
 
-from gw_data import SIGNAL_SECS, SIGNAL_LEN
-
-WINDOWS = 16
-WINDOW_LEN = SIGNAL_LEN // WINDOWS
-MAX_LAG_MILLIS = 10
-MAX_LAG = ceil(MAX_LAG_MILLIS * SIGNAL_LEN / (1000 * SIGNAL_SECS))
+from preprocessor_meta import CORR_NUM_WINDOWS, CORR_WINDOW_LEN, CORR_MAX_LAG
 
 
 def lagged_cosine(x: np.ndarray, y: np.ndarray, lag_y: int) -> float:
@@ -36,36 +30,27 @@ def scan_lagged_cosine(x: np.ndarray, y: np.ndarray, max_lag: int) -> np.ndarray
 
 def correlate(sig1: np.ndarray, sig2: np.ndarray) -> np.ndarray:
     """
-    Computes an np.ndarray shaped (2, 1, WINDOWS) with dimensions as defined for `process`
+    Computes an np.ndarray shaped (NUM_LAGS, WINDOWS) with dimensions as defined for `process`
     """
     if len(sig1.shape) != 1 or sig1.shape != sig2.shape:
         raise ValueError(f"Invalid shapes: {sig1.size} and {sig2.size}")
-    result = np.zeros((2, 1, WINDOWS), dtype=float)
-    for window in range(WINDOWS):
-        i0 = window * WINDOW_LEN
-        i1 = (window + 1) * WINDOW_LEN
-        cs = scan_lagged_cosine(sig1[i0:i1], sig2[i0:i1], MAX_LAG)
-        result[0, 0, window] = np.max(cs)
-        argmax = np.argmax(cs)
-        result[1, 0, window] = (argmax - MAX_LAG) / MAX_LAG
-    return result
+    window_lags_list: List[np.ndarray] = []
+    for window in range(CORR_NUM_WINDOWS):
+        i0 = window * CORR_WINDOW_LEN
+        i1 = (window + 1) * CORR_WINDOW_LEN
+        window_lags_list.append(
+            scan_lagged_cosine(sig1[i0:i1], sig2[i0:i1], CORR_MAX_LAG)
+        )
+    return np.stack(window_lags_list, axis=1)
 
 
 def process(sigs: np.ndarray) -> np.ndarray:
     """
-    Computes an np.ndarray of type float, shaped (2, 2, WINDOWS), where
+    Computes an np.ndarray of type float, shaped (NUM_LAGS, 2, WINDOWS), where
 
     * the indices represent (channel, signal pair, width)
 
     * the signal pair dimension represents comparing signals (0, 1) and then (0, 2)
-
-    * the two output channels are
-
-      * a maximum (across offsets) correlation between two signals in a time window.
-        (It is important that we don't normalize these values, since the magnitude of
-        a correlation has intrinsic meaning. But they are between 0 and 1 anyway.)
-
-      * an offset between -1 and 1 representing between +/- MAX_LAG_MILLIS
 
     :param sigs: output from filter_sig
     """
