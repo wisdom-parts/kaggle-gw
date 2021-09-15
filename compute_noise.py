@@ -72,7 +72,7 @@ if __name__ == "__main__":
     )
     args = arg_parser.parse_args()
 
-    rows = np.loadtxt(training_labels_file(args.source), delimiter=",", dtype=str)
+    rows = np.loadtxt(str(training_labels_file(args.source)), delimiter=",", dtype=str)
     negative_ids = [idd for idd, label in rows[1:] if label == "0"]
 
     noise = compute_noise(args.source, sample(negative_ids, 100000))
