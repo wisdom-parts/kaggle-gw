@@ -1,6 +1,7 @@
 import argparse
 import datetime
 import shutil
+import sys
 from typing import Callable, Mapping, Set
 
 from pycbc.fft import backend_support
@@ -76,8 +77,10 @@ def preprocess(
         existing_ids = set(read_first_column(training_labels_file(dest)))
         if chosen_ids != existing_ids:
             print(
-                "Tried to process a different set of training example ids than already exists in {dest}"
+                f"Tried to process a different set of training example ids than already exists in {dest}",
+                file=sys.stderr,
             )
+            sys.exit(-1)
     else:
         with open(training_labels_file(source)) as training_labels_in:
             with open(training_labels_file(dest), "w") as training_labels_out:
