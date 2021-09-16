@@ -21,10 +21,7 @@ from preprocessors.filter_sig import WINDOW
 def update_psd(
     det_psd: FrequencySeries, fs: FrequencySeries, count: int
 ) -> FrequencySeries:
-    if not det_psd:
-        return abs(fs)
-    else:
-        return (abs(fs) + (count - 1) * det_psd) / count
+    return (abs(fs) + (count - 1) * det_psd) / count
 
 
 def sig_to_fs(sig: np.ndarray) -> FrequencySeries:
@@ -33,22 +30,24 @@ def sig_to_fs(sig: np.ndarray) -> FrequencySeries:
 
 
 def compute_noise(source_dir: Path, sample_ids: List[str]) -> np.ndarray:
-    # Algorithm provided in https://github.com/gwastro/pycbc/issues/3761#issuecomment-895066248
+    if len(sample_ids) == 0:
+        raise ValueError("sample_ids cannot be empty")
 
-    psd: Optional[List[FrequencySeries]] = None
+    # Algorithm provided in https://github.com/gwastro/pycbc/issues/3761#issuecomment-895066248
+    psds: Optional[List[FrequencySeries]] = None
 
     for count, idd in enumerate(sample_ids, start=1):
         sigs = np.load(str(train_file(source_dir, idd)))
-        fs = [sig_to_fs(sigs[i]) for i in range(N_SIGNALS)]
-        psd = (
-            [update_psd(psd[i], fs[i], count) for i in range(N_SIGNALS)] if psd else fs
-        )
+        fss = [sig_to_fs(sigs[i]) for i in range(N_SIGNALS)]
+        psds = [
+            (update_psd(psds[i], fss[i], count) if psds else abs(fss[i]))
+            for i in range(N_SIGNALS)
+        ]
         if count % 1000 == 0:
             print(f"Completed {count} of {len(sample_ids)}")
 
-    if not psd:
-        raise ValueError("no data")
-    return np.stack(psd)
+    assert psds
+    return np.stack(psds)
 
 
 if __name__ == "__main__":
