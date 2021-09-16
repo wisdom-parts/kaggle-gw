@@ -82,6 +82,7 @@ def validate_source_dir(source_dir: Path) -> bool:
         raise FileNotFoundError(f"missing {TRAINING_LABELS_FILENAME} in {source_dir}")
     if not os.path.isdir(train_dir(source_dir)):
         raise NotADirectoryError(f"missing {TRAIN_DIRNAME} in {source_dir}")
+
     if not os.path.isdir(test_dir(source_dir)):
         return False
     else:

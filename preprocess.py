@@ -1,16 +1,14 @@
 import argparse
 import datetime
+import re
 import shutil
 import sys
 from typing import Callable, Mapping, Set
-
-from pycbc.fft import backend_support
 
 from command_line import path_to_dir
 from gw_data import *
 from gw_data import make_data_dirs
 from preprocessors import filter_sig, qtransform, correlation
-
 
 ProcessFunction = Callable[[np.ndarray], np.ndarray]
 
@@ -58,12 +56,6 @@ def preprocess(
     dest_data_name: str,
     num_train_examples: Optional[int],
 ):
-    fft_backends = backend_support.get_backend_names()
-    print(f"Available fft backends: {fft_backends}")
-    if "cuda" in fft_backends:
-        print("Using cuda.")
-        backend_support.set_backend(["cuda"])
-
     has_test_data = validate_source_dir(source)
 
     os.makedirs(dest, exist_ok=True)
@@ -124,11 +116,21 @@ def read_first_column(path: Path) -> List[str]:
     return vs
 
 
+class DataPartition:
+    def __init__(self, spec: str):
+        if not re.fullmatch(r"\d+/\d+", spec):
+            raise ValueError("must specify data partition as I/N")
+        i_str, n_str = spec.split("/")
+
+        self.partition = int(i_str)
+        self.num_partitions = int(n_str)
+
+
 if __name__ == "__main__":
     arg_parser = argparse.ArgumentParser()
     arg_parser.add_argument(
         "-n",
-        help="number of training examples to preprocess (omits test examples)",
+        help="number of training examples to preprocess (if set, test examples are omitted)",
         type=int,
     )
     arg_parser.add_argument(
@@ -140,6 +142,11 @@ if __name__ == "__main__":
         "--to",
         dest="dest_data_name",
         help="destination data name (just for cp, otherwise ignored)",
+    )
+    arg_parser.add_argument(
+        "--partition",
+        help='which partition to process, where "1/6" means partition 1 of 6',
+        type=DataPartition,
     )
     arg_parser.add_argument(
         "processor", help="which processor to run", choices=process_fns.keys()
