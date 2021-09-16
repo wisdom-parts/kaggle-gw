@@ -11,7 +11,7 @@ from torch import Tensor, nn
 from torch.utils.data import Dataset, random_split, DataLoader, Subset
 from sklearn.metrics import roc_auc_score
 
-from gw_data import training_labels_file, train_file, validate_source_dir
+from gw_data import training_labels_file, train_file, validate_source_dir, DATA_VERSION
 from preprocessor_meta import PreprocessorMeta
 
 
@@ -204,7 +204,7 @@ class ModelManager(ABC):
         )
         wandb.log(
             {
-                "epoch": epoch,
+                "epoch": epoch + 1,
                 "test_loss": test_loss,
                 "test_accuracy": test_accuracy,
                 "zero_pred": zero_pred,
@@ -230,6 +230,7 @@ class ModelManager(ABC):
         model.to(device, dtype=hp.dtype)
         loss_fn = nn.BCEWithLogitsLoss()
         wandb.watch(model, criterion=loss_fn, log="all", log_freq=100)
+        wandb.log({"data_version": DATA_VERSION})
         train_dataloader = DataLoader(data.train, batch_size=hp.batch, shuffle=True)
         test_dataloader = DataLoader(data.test, batch_size=hp.batch, shuffle=True)
         print(hp)
