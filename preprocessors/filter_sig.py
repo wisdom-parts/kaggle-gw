@@ -41,4 +41,4 @@ noise_psds = [FrequencySeries(_noise[i], FREQ_SERIES_DELTA_F) for i in range(N_S
 def process(sigs: np.ndarray) -> np.ndarray:
     if sigs.shape != (N_SIGNALS, SIGNAL_LEN):
         raise ValueError(f"unexpected sigs shape: {sigs.shape}")
-    return np.stack([process_sig(sigs[i], noise_psds[i]) for i in range(len(sigs))])
+    return np.stack([process_sig(sigs[i], noise_psds[i]) for i in range(N_SIGNALS)])
