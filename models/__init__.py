@@ -301,7 +301,13 @@ class ModelManager(ABC):
         pickle.dump(model, open(filename, "wb"))
 
         if prep_test_data: # we want to prepare test data
-            model.predict(test)
+            with open("submissions.csv", "w"):
+                for _id in data.gw.test_ids:
+                    x = data.gw.get_test_id(_id)
+                    # add batch dimension
+                    x = torch.unsqueeze(x, 0)
+                    pred = model(x)
+
         print("Done!")
 
 
