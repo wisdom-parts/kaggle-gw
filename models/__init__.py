@@ -8,6 +8,8 @@ from typing import Optional, Callable, List, Dict, Tuple, Type
 import numpy as np
 import torch
 import wandb
+import pickle
+import datetime
 from torch import Tensor, nn
 from torch.utils.data import Dataset, random_split, DataLoader, Subset
 from sklearn.metrics import roc_auc_score
@@ -93,9 +95,9 @@ def gw_train_and_test_datasets(
     )
     num_examples = len(gw)
     num_train_examples = int(num_examples * 0.8)
-    num_test_examples = num_examples - num_train_examples
-    train, test = random_split(gw, [num_train_examples, num_test_examples])
-    return MyDatasets(gw, train, test)
+    num_validation_examples = num_examples - num_train_examples
+    train, validation = random_split(gw, [num_train_examples, num_validation_examples])
+    return MyDatasets(gw, train, validation)
 
 
 TRAIN_LOGGING_INTERVAL = 30
@@ -111,6 +113,7 @@ class ModelManager(ABC):
         n: Optional[int],
         device: torch.device,
         hp: "HyperParameters",
+        prep_test_data: Bool,
     ):
         pass
 
@@ -227,6 +230,7 @@ class ModelManager(ABC):
         n: Optional[int],
         preprocessors: List[PreprocessorMeta],
         hp: "HyperParameters",
+        prep_test_data: Bool,
     ):
         data = gw_train_and_test_datasets(data_dir, n, preprocessors, hp.dtype, device)
         model.to(device, dtype=hp.dtype)
@@ -234,7 +238,7 @@ class ModelManager(ABC):
         wandb.watch(model, criterion=loss_fn, log="all", log_freq=100)
         wandb.log({"data_version": DATA_VERSION})
         train_dataloader = DataLoader(data.train, batch_size=hp.batch, shuffle=True)
-        test_dataloader = DataLoader(data.test, batch_size=hp.batch, shuffle=True)
+        validation_dataloader = DataLoader(data.validation, batch_size=hp.batch, shuffle=True)
         print(hp)
         optimizer = torch.optim.Adam(model.parameters(), lr=hp.lr)
         for epoch in range(hp.epochs):
@@ -242,12 +246,12 @@ class ModelManager(ABC):
             self._train_epoch(
                 model, loss_fn, train_dataloader, len(data.train), optimizer
             )
-            self._test(epoch, model, loss_fn, test_dataloader, len(data.test))
+            self._test(epoch, model, loss_fn, validation_dataloader, len(data.validation))
 
         confusion_sample_indices = (
-            random.sample(data.test.indices, SAMPLES_TO_CHECK)
-            if len(data.test) > SAMPLES_TO_CHECK
-            else data.test.indices
+            random.sample(data.validation.indices, SAMPLES_TO_CHECK)
+            if len(data.validation) > SAMPLES_TO_CHECK
+            else data.validation.indices
         )
         confusion_sample: Dict[str, List[str]] = {}
 
@@ -281,6 +285,13 @@ class ModelManager(ABC):
         print("Confusion matrix sample:")
         print(repr(confusion_sample))
 
+        cur_time = datetime.datetime.now()
+        timestamp = cur_time.strftime("%m%d%Y (%H:%M:%S)")
+        filename = f"{timestamp}_model.pkl"
+        pickle.dump(model, open(filename, "wb"))
+
+        if prep_test_data: # we want to prepare test data
+            model.predict(test)
         print("Done!")
 
 
@@ -297,7 +308,7 @@ class HyperParameters:
 
 
 def train_model(
-    manager: ModelManager, data_dir: Path, n: Optional[int], hp: HyperParameters
+    manager: ModelManager, data_dir: Path, n: Optional[int], hp: HyperParameters, prep_test_data: Bool
 ):
     validate_source_dir(data_dir)
 
@@ -305,7 +316,7 @@ def train_model(
     print(f"Using device {device_name}")
     device = torch.device(device_name)
 
-    manager.train(data_dir, n, device, hp)
+    manager.train(data_dir, n, device, hp, prep_test_data)
 
 
 class RegressionHead(Enum):
