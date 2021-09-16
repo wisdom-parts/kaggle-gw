@@ -10,13 +10,17 @@ N_SIGNALS = 3
 SIGNAL_NAMES = ["LIGO Hanford", "LIGO Livingston", "Virgo"]
 SIGNAL_LEN = 4096
 SIGNAL_SECS = 2.0
-DELTA_T = SIGNAL_SECS / SIGNAL_LEN
-SIGNAL_TIMES = [i * DELTA_T for i in range(SIGNAL_LEN)]
+SIGNAL_DELTA_T = SIGNAL_SECS / SIGNAL_LEN
+SIGNAL_TIMES = [i * SIGNAL_DELTA_T for i in range(SIGNAL_LEN)]
+
+FREQ_SERIES_DELTA_F = 1 / SIGNAL_SECS
+NOISE_FILENAME = "noise.npy"
 
 SAMPLE_SUBMISSION_FILENAME = "sample_submission.csv"
 TRAINING_LABELS_FILENAME = "training_labels.csv"
 TRAIN_DIRNAME = "train"
 TEST_DIRNAME = "test"
+DATA_VERSION = "2"
 EXAMPLE_ID_LEN = 10
 
 hex_low = hexdigits[0:16]
@@ -43,7 +47,7 @@ def relative_example_path(example_id: str, data_name: Optional[str] = None):
     Returns the relative path from a train or test directory to the data file for the
     given example_id and data_name.
     """
-    prefix = data_name + "_" if data_name else ""
+    prefix = data_name + DATA_VERSION + "_" if data_name else ""
     return (
         Path(example_id[0])
         / example_id[1]

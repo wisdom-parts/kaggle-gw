@@ -1,6 +1,7 @@
 from typing import Tuple, cast
 
 import numpy as np
+from pycbc.types import FrequencySeries
 
 from gw_data import (
     N_SIGNALS,
@@ -8,7 +9,7 @@ from gw_data import (
     SIGNAL_SECS,
 )
 from gw_processing import timeseries_from_signal, window_sigs
-from preprocessor_meta import Preprocessor, qtransform_meta, qtransform_64x256_meta
+from preprocessor_meta import qtransform_meta
 
 
 def qtransform_sig(
@@ -21,8 +22,7 @@ def qtransform_sig(
     * qplane (numpy.ndarray (2d)) – The two dimensional interpolated qtransform of this time series,
     *        in the specified output_shape representing (freqs, times)
     """
-    ts = timeseries_from_signal(window_sigs(sig))
-
+    ts = timeseries_from_signal(sig)
     # As of this writing, the return type for qtransform is incorrectly declared. (or inferred?)
     # noinspection PyTypeChecker
     result: Tuple[np.ndarray, np.ndarray, np.ndarray] = ts.qtransform(
@@ -47,13 +47,7 @@ def process_given_shape(
     return np.stack([process_sig(sig, output_shape[1:]) for sig in sigs])
 
 
-def process_original(sigs: np.ndarray) -> np.ndarray:
+def process(sigs: np.ndarray) -> np.ndarray:
     return process_given_shape(
         sigs, cast(Tuple[int, int, int], qtransform_meta.output_shape)
-    )
-
-
-def process_64x256(sigs: np.ndarray) -> np.ndarray:
-    return process_given_shape(
-        sigs, cast(Tuple[int, int, int], qtransform_64x256_meta.output_shape)
     )

@@ -11,12 +11,12 @@ from gw_data import *
 from gw_data import make_data_dirs
 from preprocessors import filter_sig, qtransform, correlation
 
+
 ProcessFunction = Callable[[np.ndarray], np.ndarray]
 
-processors: Mapping[str, ProcessFunction] = {
+process_fns: Mapping[str, ProcessFunction] = {
     "filter_sig": filter_sig.process,
-    "qtransform": qtransform.process_original,
-    "qtransform_64x256": qtransform.process_64x256,
+    "qtransform": qtransform.process,
     "correlation": correlation.process,
     "cp": lambda x: x,
 }
@@ -142,7 +142,7 @@ if __name__ == "__main__":
         help="destination data name (just for cp, otherwise ignored)",
     )
     arg_parser.add_argument(
-        "processor", help="which processor to run", choices=processors.keys()
+        "processor", help="which processor to run", choices=process_fns.keys()
     )
     arg_parser.add_argument(
         "source",
@@ -158,10 +158,10 @@ if __name__ == "__main__":
     source_data_name = (
         args.source_data_name
         if args.processor == "cp"
-        else ("filter_sig" if args.processor == "correlation" else None)
+        else ("filter_sig" if args.processor in ("correlation", "qtransform") else None)
     )
     preprocess(
-        processors[args.processor],
+        process_fns[args.processor],
         args.source,
         source_data_name,
         args.dest,
