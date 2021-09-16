@@ -13,7 +13,7 @@ from torch import Tensor, nn
 from torch.utils.data import Dataset, random_split, DataLoader, Subset
 from sklearn.metrics import roc_auc_score
 
-from gw_data import training_labels_file, train_file, validate_source_dir
+from gw_data import training_labels_file, train_file, validate_source_dir, sample_submission_file, test_file
 from preprocessor_meta import PreprocessorMeta
 
 
@@ -36,6 +36,7 @@ class GwDataset(Dataset[Tuple[Tensor, Tensor]]):
         self.transform = transform
         self.target_transform = target_transform
         self.ids: List[str] = []
+        self.test_ids: List[str] = []
         self.id_to_label: Dict[str, int] = {}
         with open(training_labels_file(data_dir)) as id_label_file:
             for id_label in id_label_file:
@@ -45,6 +46,11 @@ class GwDataset(Dataset[Tuple[Tensor, Tensor]]):
                     self.id_to_label[_id] = int(label)
                     if n and len(self.ids) >= n:
                         break
+        with open(sample_submission_file(data_dir)) as test_id_label_file:
+            for id_label in test_id_label_file:
+                _id, _ = id_label.split(",")
+                if _id != "id":
+                    self.test_ids.append(_id)
         preprocessor_name = preprocessors[0].name
         self.data_name = (
             preprocessor_name
@@ -63,6 +69,13 @@ class GwDataset(Dataset[Tuple[Tensor, Tensor]]):
         y = self.target_transform(self.id_to_label[_id])
 
         return x, y
+
+    def get_test_id(self, idx: int) -> Tensor:
+        _id = self.test_ids[idx]
+        fpath = str(test_file(self.data_dir, _id, self.data_name))
+
+        x = self.transform(np.load(fpath))
+        return x
 
 
 @dataclass
