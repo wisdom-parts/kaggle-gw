@@ -20,7 +20,7 @@ SAMPLE_SUBMISSION_FILENAME = "sample_submission.csv"
 TRAINING_LABELS_FILENAME = "training_labels.csv"
 TRAIN_DIRNAME = "train"
 TEST_DIRNAME = "test"
-DATA_VERSION = "2"
+DATA_VERSION = 2
 EXAMPLE_ID_LEN = 10
 
 hex_low = hexdigits[0:16]
@@ -47,7 +47,7 @@ def relative_example_path(example_id: str, data_name: Optional[str] = None):
     Returns the relative path from a train or test directory to the data file for the
     given example_id and data_name.
     """
-    prefix = data_name + DATA_VERSION + "_" if data_name else ""
+    prefix = data_name + str(DATA_VERSION) + "_" if data_name else ""
     return (
         Path(example_id[0])
         / example_id[1]
