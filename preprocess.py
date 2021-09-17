@@ -3,6 +3,9 @@ import datetime
 import re
 import shutil
 import sys
+from abc import ABC, abstractmethod
+from os.path import samefile
+from time import sleep
 from typing import Callable, Mapping, Set
 
 from command_line import path_to_dir
@@ -18,6 +21,79 @@ process_fns: Mapping[str, ProcessFunction] = {
     "correlation": correlation.process,
     "cp": lambda x: x,
 }
+
+
+class DataSubset(ABC):
+    def __init__(self, covers_all_training_data: bool, process_test_data: bool):
+        self.covers_all_training_data = covers_all_training_data
+        self.process_test_data = process_test_data
+
+    def before_preprocessing(self):
+        pass
+
+    @abstractmethod
+    def ids_to_process(self, source_ids: List[str]) -> Set[str]:
+        pass
+
+    def before_creating_dest(self):
+        pass
+
+
+class DataAll(DataSubset):
+    def __init__(self):
+        super().__init__(covers_all_training_data=True, process_test_data=True)
+
+    def ids_to_process(self, source_ids: List[str]) -> Set[str]:
+        return set(source_ids)
+
+
+class DataN(DataSubset):
+    def __init__(self, spec: str):
+        super().__init__(covers_all_training_data=False, process_test_data=False)
+        self.n = int(spec)
+
+    def ids_to_process(self, source_ids: List[str]) -> Set[str]:
+        if self.n > len(source_ids):
+            raise ValueError(
+                f"There are fewer than {self.n} training examples in the source directory."
+            )
+        return set(source_ids[0 : self.n])
+
+
+class DataPartition(DataSubset):
+    def __init__(self, spec: str):
+        super().__init__(covers_all_training_data=True, process_test_data=True)
+        if not re.fullmatch(r"\d+/\d+", spec):
+            raise ValueError("must specify data partition as P/N")
+        p_str, n_str = spec.split("/")
+
+        self.partition = int(p_str)
+        self.num_partitions = int(n_str)
+        if self.partition < 1 or self.partition > self.num_partitions:
+            raise ValueError(
+                f"partition {self.partition} not between 1 and {self.num_partitions}"
+            )
+
+    def before_preprocessing(self):
+        if self.partition != 1:
+            # Give partition 1 time to create the destination directory and training labels file.
+            sleep(10)
+
+    def ids_to_process(self, source_ids: List[str]) -> Set[str]:
+        partition_size = len(source_ids) // self.num_partitions
+        start = (self.partition - 1) * partition_size
+        end = (
+            self.partition * partition_size
+            if self.partition < self.num_partitions
+            else len(source_ids)
+        )
+        return set(source_ids[start:end])
+
+    def before_creating_dest(self):
+        if self.partition != 1:
+            raise RuntimeError(
+                f"partition {self.partition} was run before partition 1 created the destination directory"
+            )
 
 
 def preprocess_train_or_test(
@@ -54,32 +130,40 @@ def preprocess(
     source_data_name: Optional[str],
     dest: Path,
     dest_data_name: str,
-    num_train_examples: Optional[int],
+    data_subset: DataSubset,
 ):
     has_test_data = validate_source_dir(source)
 
-    os.makedirs(dest, exist_ok=True)
+    data_subset.before_preprocessing()
+    source_train_id_list = read_first_column(training_labels_file(source))
+    source_train_id_set = set(source_train_id_list)
+    ids_to_process = data_subset.ids_to_process(source_train_id_list)
 
-    all_ids = read_first_column(training_labels_file(source))
-
-    num_ids = num_train_examples or len(all_ids)
-    chosen_ids = set(all_ids[0:num_ids])
-
-    if training_labels_file(dest).exists():
-        existing_ids = set(read_first_column(training_labels_file(dest)))
-        if chosen_ids != existing_ids:
-            print(
-                f"Tried to process a different set of training example ids than already exists in {dest}",
-                file=sys.stderr,
-            )
-            sys.exit(-1)
+    if dest.exists():
+        if not data_subset.covers_all_training_data or not samefile(source, dest):
+            dest_ids = set(read_first_column(training_labels_file(dest)))
+            if dest_ids != (
+                source_train_id_set
+                if data_subset.covers_all_training_data
+                else ids_to_process
+            ):
+                print(
+                    f"{dest} has different training examples than the set we will process.",
+                    file=sys.stderr,
+                )
+                sys.exit(1)
     else:
-        with open(training_labels_file(source)) as training_labels_in:
-            with open(training_labels_file(dest), "w") as training_labels_out:
-                for line in training_labels_in:
-                    example_id = line.split(",")[0]
-                    if example_id == "id" or example_id in chosen_ids:
-                        training_labels_out.write(line)
+        data_subset.before_creating_dest()
+        os.makedirs(dest)
+        if data_subset.covers_all_training_data:
+            shutil.copy(training_labels_file(source), training_labels_file(dest))
+        else:
+            with open(training_labels_file(source)) as training_labels_in:
+                with open(training_labels_file(dest), "w") as training_labels_out:
+                    for line in training_labels_in:
+                        example_id = line.split(",")[0]
+                        if example_id == "id" or example_id in ids_to_process:
+                            training_labels_out.write(line)
 
     preprocess_train_or_test(
         process_fn,
@@ -87,22 +171,22 @@ def preprocess(
         source_data_name=source_data_name,
         dest=train_dir(dest),
         dest_data_name=dest_data_name,
-        ids_to_process=chosen_ids,
+        ids_to_process=ids_to_process,
     )
 
-    if has_test_data and not num_train_examples:
+    if has_test_data and data_subset.process_test_data:
         dest_sample_submission = sample_submission_file(dest)
         if not dest_sample_submission.exists():
             shutil.copy(sample_submission_file(source), dest_sample_submission)
 
-        all_ids = read_first_column(sample_submission_file(source))
+        source_test_id_set = set(read_first_column(sample_submission_file(source)))
         preprocess_train_or_test(
             process_fn,
             source=test_dir(source),
             source_data_name=source_data_name,
             dest=test_dir(dest),
             dest_data_name=dest_data_name,
-            ids_to_process=set(all_ids),
+            ids_to_process=source_test_id_set,
         )
 
 
@@ -116,22 +200,12 @@ def read_first_column(path: Path) -> List[str]:
     return vs
 
 
-class DataPartition:
-    def __init__(self, spec: str):
-        if not re.fullmatch(r"\d+/\d+", spec):
-            raise ValueError("must specify data partition as I/N")
-        i_str, n_str = spec.split("/")
-
-        self.partition = int(i_str)
-        self.num_partitions = int(n_str)
-
-
-if __name__ == "__main__":
+def main():
     arg_parser = argparse.ArgumentParser()
     arg_parser.add_argument(
         "-n",
         help="number of training examples to preprocess (if set, test examples are omitted)",
-        type=int,
+        type=DataN,
     )
     arg_parser.add_argument(
         "--from",
@@ -162,16 +236,27 @@ if __name__ == "__main__":
         type=Path,
     )
     args = arg_parser.parse_args()
+
+    if args.n and args.partition:
+        print("can't specify both -n and --partition", file=sys.stderr)
+        sys.exit(1)
+    data_subset = args.n or args.partition or DataAll()
+
     source_data_name = (
         args.source_data_name
         if args.processor == "cp"
         else ("filter_sig" if args.processor in ("correlation", "qtransform") else None)
     )
+
     preprocess(
         process_fns[args.processor],
         args.source,
         source_data_name,
         args.dest,
         args.dest_data_name if args.processor == "cp" else args.processor,
-        args.n,
+        data_subset,
     )
+
+
+if __name__ == "__main__":
+    main()
