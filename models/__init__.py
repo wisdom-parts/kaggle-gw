@@ -271,6 +271,16 @@ class ModelManager(ABC):
                 csvwriter.writerow([_id, pred])
         print ("Finished writing to submissions.csv!")
 
+    def _store_the_model(self, model: nn.Module):
+        """
+            Dump the model as a pickle file into the local disk.
+        """
+        cur_time = datetime.datetime.now()
+        timestamp = cur_time.strftime("%m%d%Y (%H:%M:%S)")
+        filename = f"{timestamp}_model.pkl"
+        pickle.dump(model, open(filename, "wb"))
+        print (f"Latest model has been stored as {filename}")
+
     def _train(
         self,
         model: nn.Module,
@@ -332,12 +342,7 @@ class ModelManager(ABC):
 
         print("Confusion matrix sample:")
         print(repr(confusion_sample))
-
-        cur_time = datetime.datetime.now()
-        timestamp = cur_time.strftime("%m%d%Y (%H:%M:%S)")
-        filename = f"{timestamp}_model.pkl"
-        pickle.dump(model, open(filename, "wb"))
-
+        self._store_the_model(model)
         if prep_test_data: # we want to prepare test data
             self._test(model, data.gw_test)
 
