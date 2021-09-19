@@ -6,7 +6,7 @@ import sys
 from abc import ABC, abstractmethod
 from os.path import samefile
 from time import sleep
-from typing import Callable, Mapping, Set
+from typing import Callable, Mapping, Set, Tuple, cast
 
 from command_line import path_to_dir
 from gw_data import *
@@ -103,6 +103,8 @@ def preprocess_train_or_test(
     dest: Path,
     dest_data_name: str,
     ids_to_process: Set[str],
+    mean: float,
+    stdev: float,
 ):
     print("======================")
     print(f"Preprocessing {source} -> {dest}")
@@ -116,12 +118,36 @@ def preprocess_train_or_test(
         source_path = relative_example_path(example_id, source_data_name)
         x = np.load(str(source / source_path))
         dest_path = relative_example_path(example_id, dest_data_name)
-        np.save(str(dest / dest_path), process_fn(x))
+        raw = process_fn(x)
+        normalized = (raw - mean) / stdev
+        np.save(str(dest / dest_path), normalized)
         count += 1
         if count % 100 == 0:
             print(f"{datetime.datetime.now()}: processed {count} rows")
 
     print("Done!")
+
+
+MAX_NORMALIZATION_SAMPLE_SIZE = 100
+MAX_NORMALIZATION_SAMPLE_FRACTION = 0.1
+
+
+def sample_mean_and_stdev(
+    process_fn: ProcessFunction,
+    source: Path,
+    source_data_name: Optional[str],
+    source_train_id_list: List[str],
+) -> Tuple[float, float]:
+    sample_size = min(
+        MAX_NORMALIZATION_SAMPLE_SIZE,
+        int(MAX_NORMALIZATION_SAMPLE_FRACTION * len(source_train_id_list)),
+    )
+    sample_ids = source_train_id_list[0:sample_size]
+    sample_paths = [
+        source / relative_example_path(idd, source_data_name) for idd in sample_ids
+    ]
+    sample_data = np.array([process_fn(np.load(str(path))) for path in sample_paths])
+    return cast(float, np.mean(sample_data)), cast(float, np.std(sample_data))
 
 
 def preprocess(
@@ -165,6 +191,10 @@ def preprocess(
                         if example_id == "id" or example_id in train_ids_to_process:
                             training_labels_out.write(line)
 
+    mean, stdev = sample_mean_and_stdev(
+        process_fn, train_dir(source), source_data_name, source_train_id_list
+    )
+
     preprocess_train_or_test(
         process_fn,
         source=train_dir(source),
@@ -172,6 +202,8 @@ def preprocess(
         dest=train_dir(dest),
         dest_data_name=dest_data_name,
         ids_to_process=train_ids_to_process,
+        mean=mean,
+        stdev=stdev,
     )
 
     if has_test_data and data_subset.process_test_data:
@@ -188,6 +220,8 @@ def preprocess(
             dest=test_dir(dest),
             dest_data_name=dest_data_name,
             ids_to_process=test_ids_to_process,
+            mean=mean,
+            stdev=stdev,
         )
 
 
