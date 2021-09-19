@@ -1,0 +1,65 @@
+program: python
+command:
+  - ${program}
+  - -m
+  - model
+  - -n
+  - 10000
+  - q_cnn
+  - ${args}
+  - /home/ec2-user/data2-40000-avoid-qt-norm
+method: bayes
+metric:
+  name: AUC
+  goal: maximize
+parameters:
+  preprocessor:
+    value: QTRANSFORM
+  batch:
+    value: 256
+  lr:
+    min: 0.005
+    max: 0.03
+  epochs:
+    value: 2
+  convlayers:
+    min: 2
+    max: 4
+  conv1h:
+    values: [1, 3, 17, 33, 49, 65]
+  conv1w:
+    values: [1, 3, 17, 33, 49, 65]
+  conv1out:
+    min: 10
+    max: 100
+  conv2h:
+    values: [1, 3, 17, 33, 49, 65]
+  conv2w:
+    values: [1, 3, 17, 33, 49, 65]
+  conv2out:
+    min: 10
+    max: 100
+  conv3h:
+    values: [1, 3, 17, 33, 49, 65]
+  conv3w:
+    values: [1, 3, 17, 33, 49, 65]
+  conv3out:
+    min: 10
+    max: 100
+  conv4h:
+    values: [1, 3, 17, 33, 49, 65]
+  conv4w:
+    values: [1, 3, 17, 33, 49, 65]
+  conv4out:
+    min: 10
+    max: 100
+  linear1out:
+    values: [1, 5, 20, 50, 100, 150, 200]
+  convdrop:
+    min: 0.0
+    max: 0.7
+  linear1drop:
+    min: 0.0
+    max: 0.7
+  head:
+    values: [LINEAR, MAX, AVG_LINEAR]
