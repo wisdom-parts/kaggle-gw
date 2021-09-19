@@ -29,7 +29,7 @@ class Args:
         default=None,
         help="number of training examples to use",
     )
-    prep_data_for_submission: Bool = arg(
+    prep_data_for_submission: bool = arg(
         aliases=["-ps"],
         default=False,
         help="flag to indicate if prep data for submission",

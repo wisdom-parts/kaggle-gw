@@ -144,7 +144,7 @@ class ModelManager(ABC):
         n: Optional[int],
         device: torch.device,
         hp: "HyperParameters",
-        prep_test_data: Bool,
+        prep_test_data: bool,
     ):
         pass
 
@@ -289,7 +289,7 @@ class ModelManager(ABC):
         n: Optional[int],
         preprocessors: List[PreprocessorMeta],
         hp: "HyperParameters",
-        prep_test_data: Bool,
+        prep_test_data: bool,
     ):
         data = gw_train_and_test_datasets(data_dir, n, preprocessors, hp.dtype, device)
         model.to(device, dtype=hp.dtype)
@@ -362,7 +362,7 @@ class HyperParameters:
 
 
 def train_model(
-    manager: ModelManager, data_dir: Path, n: Optional[int], hp: HyperParameters, prep_test_data: Bool
+    manager: ModelManager, data_dir: Path, n: Optional[int], hp: HyperParameters, prep_test_data: bool
 ):
     validate_source_dir(data_dir)
 
