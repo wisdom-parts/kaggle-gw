@@ -4,7 +4,6 @@ from typing import List, Optional
 
 import numpy as np
 from pycbc.types import TimeSeries, FrequencySeries
-from scipy.signal.windows import tukey
 
 from command_line import path_to_dir
 from gw_data import (
@@ -15,7 +14,7 @@ from gw_data import (
     N_SIGNALS,
     SIGNAL_DELTA_T,
 )
-from preprocessors.filter_sig import WINDOW
+from preprocessors import filter_sig
 
 
 def update_psd(
@@ -25,7 +24,7 @@ def update_psd(
 
 
 def sig_to_fs(sig: np.ndarray) -> FrequencySeries:
-    ts = WINDOW * TimeSeries(sig, delta_t=SIGNAL_DELTA_T)
+    ts = TimeSeries(sig * filter_sig.WINDOW, delta_t=SIGNAL_DELTA_T)
     return ts.to_frequencyseries(FREQ_SERIES_DELTA_F)
 
 

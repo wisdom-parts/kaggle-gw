@@ -7,11 +7,7 @@ from pycbc.types import TimeSeries, FrequencySeries
 from gw_data import N_SIGNALS, SIGNAL_LEN, NOISE_FILENAME, FREQ_SERIES_DELTA_F
 from gw_processing import timeseries_from_signal
 
-WINDOW = scipy.signal.windows.tukey(4096, alpha=0.2)
-
-
-def window(sigs: np.ndarray) -> np.ndarray:
-    return sigs * WINDOW
+WINDOW = scipy.signal.windows.tukey(4096, alpha=0.1)
 
 
 def bandpass_ts(ts: TimeSeries, lf: float = 35.0, hf: float = 350.0) -> TimeSeries:
@@ -20,7 +16,7 @@ def bandpass_ts(ts: TimeSeries, lf: float = 35.0, hf: float = 350.0) -> TimeSeri
 
 
 def process_sig_to_ts(sig: np.ndarray, noise_psd: FrequencySeries) -> TimeSeries:
-    windowed = timeseries_from_signal(window(sig))
+    windowed = timeseries_from_signal(sig * WINDOW)
     highpassed = pycbc.filter.highpass(windowed, 15, 8)
     whitened = (highpassed.to_frequencyseries() / noise_psd ** 0.5).to_timeseries()
     return bandpass_ts(whitened)
