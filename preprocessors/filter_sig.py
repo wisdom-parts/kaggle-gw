@@ -6,6 +6,7 @@ from pycbc.types import TimeSeries, FrequencySeries
 
 from gw_data import N_SIGNALS, SIGNAL_LEN, NOISE_FILENAME, FREQ_SERIES_DELTA_F
 from gw_processing import timeseries_from_signal
+from preprocessor_meta import FILTER_CROP
 
 WINDOW = scipy.signal.windows.tukey(4096, alpha=0.1)
 
@@ -27,7 +28,8 @@ def process_sig(sig: np.ndarray, noise_psd: FrequencySeries) -> np.ndarray:
         raise ValueError(f"unexpected sig shape: {sig.shape}")
     processed_ts = process_sig_to_ts(sig, noise_psd)
     preprocessed = np.array(processed_ts)
-    return (preprocessed - np.mean(preprocessed)) / np.std(preprocessed)
+    cropped = preprocessed[FILTER_CROP:-FILTER_CROP]
+    return cropped
 
 
 _noise = np.load(NOISE_FILENAME)

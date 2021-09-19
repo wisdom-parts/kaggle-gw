@@ -1,19 +1,19 @@
 from typing import Tuple, cast
 
 import numpy as np
-from pycbc.types import FrequencySeries
+from scipy.signal.windows import tukey
 
-from gw_data import (
-    N_SIGNALS,
-    SIGNAL_LEN,
-    SIGNAL_SECS,
-)
-from gw_processing import timeseries_from_signal, window_sigs
-from preprocessor_meta import qtransform_meta
+from gw_data import N_SIGNALS
+from gw_processing import timeseries_from_signal
+from preprocessor_meta import qtransform_meta, FILTER_LEN, FILTER_SECS
+
+WINDOW = tukey(FILTER_LEN, alpha=0.1)
 
 
 def qtransform_sig(
-    sig: np.ndarray, output_shape: Tuple[int, int]
+    sig: np.ndarray,
+    output_shape: Tuple[int, int],
+    avoid_normalization=True,
 ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     """
     Performs a qtransform on sig, returning
@@ -22,29 +22,33 @@ def qtransform_sig(
     * qplane (numpy.ndarray (2d)) – The two dimensional interpolated qtransform of this time series,
     *        in the specified output_shape representing (freqs, times)
     """
-    ts = timeseries_from_signal(sig)
+    windowed = timeseries_from_signal(sig * WINDOW)
     # As of this writing, the return type for qtransform is incorrectly declared. (or inferred?)
     # noinspection PyTypeChecker
-    result: Tuple[np.ndarray, np.ndarray, np.ndarray] = ts.qtransform(
-        delta_t=SIGNAL_SECS / output_shape[1],
+    times: np.ndarray
+    freqs: np.ndarray
+    qplane: np.ndarray
+    times, freqs, qplane = windowed.qtransform(
+        delta_t=FILTER_SECS / output_shape[1],
         frange=(30, 350),
         logfsteps=output_shape[0],
+        return_complex=avoid_normalization,
     )
-    assert result[2].shape == output_shape
-    return result
+    assert qplane.shape == output_shape
+    return times, freqs, abs(qplane) if avoid_normalization else qplane
 
 
 def process_sig(sig: np.ndarray, output_shape: Tuple[int, int]) -> np.ndarray:
     _, _, result = qtransform_sig(sig, output_shape)
-    return (result - np.mean(result)) / np.std(result)
+    return result
 
 
 def process_given_shape(
     sigs: np.ndarray, output_shape: Tuple[int, int, int]
 ) -> np.ndarray:
-    if sigs.shape != (N_SIGNALS, SIGNAL_LEN):
+    if sigs.shape != (N_SIGNALS, FILTER_LEN):
         raise ValueError(f"unexpected sigs shape: {sigs.shape}")
-    return np.stack([process_sig(sig, output_shape[1:]) for sig in sigs])
+    return np.array([process_sig(sig, output_shape[1:]) for sig in sigs])
 
 
 def process(sigs: np.ndarray) -> np.ndarray:
