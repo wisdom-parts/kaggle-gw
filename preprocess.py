@@ -137,7 +137,7 @@ def preprocess(
     data_subset.before_preprocessing()
     source_train_id_list = read_first_column(training_labels_file(source))
     source_train_id_set = set(source_train_id_list)
-    ids_to_process = data_subset.ids_to_process(source_train_id_list)
+    train_ids_to_process = data_subset.ids_to_process(source_train_id_list)
 
     if dest.exists():
         if not data_subset.covers_all_training_data or not samefile(source, dest):
@@ -145,7 +145,7 @@ def preprocess(
             if dest_ids != (
                 source_train_id_set
                 if data_subset.covers_all_training_data
-                else ids_to_process
+                else train_ids_to_process
             ):
                 print(
                     f"{dest} has different training examples than the set we will process.",
@@ -162,7 +162,7 @@ def preprocess(
                 with open(training_labels_file(dest), "w") as training_labels_out:
                     for line in training_labels_in:
                         example_id = line.split(",")[0]
-                        if example_id == "id" or example_id in ids_to_process:
+                        if example_id == "id" or example_id in train_ids_to_process:
                             training_labels_out.write(line)
 
     preprocess_train_or_test(
@@ -171,7 +171,7 @@ def preprocess(
         source_data_name=source_data_name,
         dest=train_dir(dest),
         dest_data_name=dest_data_name,
-        ids_to_process=ids_to_process,
+        ids_to_process=train_ids_to_process,
     )
 
     if has_test_data and data_subset.process_test_data:
@@ -179,14 +179,15 @@ def preprocess(
         if not dest_sample_submission.exists():
             shutil.copy(sample_submission_file(source), dest_sample_submission)
 
-        source_test_id_set = set(read_first_column(sample_submission_file(source)))
+        source_test_id_list = read_first_column(sample_submission_file(source))
+        test_ids_to_process = data_subset.ids_to_process(source_test_id_list)
         preprocess_train_or_test(
             process_fn,
             source=test_dir(source),
             source_data_name=source_data_name,
             dest=test_dir(dest),
             dest_data_name=dest_data_name,
-            ids_to_process=source_test_id_set,
+            ids_to_process=test_ids_to_process,
         )
 
 
