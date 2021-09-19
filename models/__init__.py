@@ -1,3 +1,6 @@
+import csv
+import datetime
+import pickle
 import random
 from abc import abstractmethod, ABC
 from dataclasses import dataclass
@@ -7,8 +10,6 @@ from typing import Optional, Callable, List, Dict, Tuple, Type
 import numpy as np
 import torch
 import wandb
-import pickle
-import datetime
 from torch import Tensor, nn
 from torch.utils.data import Dataset, random_split, DataLoader, Subset
 from sklearn.metrics import roc_auc_score
@@ -40,7 +41,7 @@ class GwSubmissionDataset(Dataset[Tuple[Tensor]]):
     def __len__(self):
         return len(self.ids)
 
-    def __getitem__(self, idx: int) -> Tuple[Tensor]:
+    def __getitem__(self, idx: int) -> Tensor:
         _id = self.ids[idx]
         fpath = str(test_file(self.data_dir, _id, self.data_name))
 
@@ -257,12 +258,18 @@ class ModelManager(ABC):
         gw_test: GwSubmissionDataset,
     ):
         num_test_examples = len(gw_test.ids)
-        with open("submissions.csv", "w"):
+        fields = ['id', 'target']
+        with open("submissions.csv", "w") as csvfile:
+            csvwriter = csv.writer(csvfile)
+            csvwriter.writerow(fields)
             for i in range(num_test_examples):
-                x = gw_test.ids[i]
+                _id = gw_test.ids[i]
+                x = gw_test[_id]
                 # add batch dimension
                 x = torch.unsqueeze(x, 0)
                 pred = model(x)
+                csvwriter.writerow([_id, pred])
+        print ("Finished writing to submissions.csv!")
 
     def _train(
         self,
