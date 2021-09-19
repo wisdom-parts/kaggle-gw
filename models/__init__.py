@@ -16,6 +16,36 @@ from sklearn.metrics import roc_auc_score
 from gw_data import training_labels_file, train_file, validate_source_dir, sample_submission_file, test_file
 from preprocessor_meta import PreprocessorMeta
 
+class GwSubmissionDataset(Dataset[Tuple[Tensor]]):
+    """
+    Represents the test data of the g2net data directory as Tensors.
+    """
+    def __init__(
+        self,
+        data_dir: Path,
+        preprocessors: List[PreprocessorMeta],
+        transform: Callable[[np.ndarray], Tensor],
+    ):
+        if len(preprocessors) > 1:
+            raise ValueError("multiple data names not yet supported")
+        self.data_dir = data_dir
+        self.transform = transform
+        self.ids: List[str] = []
+        with open(sample_submission_file(data_dir)) as test_id_label_file:
+            for id_label in test_id_label_file:
+                _id, _ = id_label.split(",")
+                if _id != "id":
+                    self.ids.append(_id)
+
+    def __len__(self):
+        return len(self.ids)
+
+    def __getitem__(self, idx: int) -> Tuple[Tensor]:
+        _id = self.ids[idx]
+        fpath = str(test_file(self.data_dir, _id, self.data_name))
+
+        x = self.transform(np.load(fpath))
+        return x
 
 class GwDataset(Dataset[Tuple[Tensor, Tensor]]):
     """
@@ -36,7 +66,6 @@ class GwDataset(Dataset[Tuple[Tensor, Tensor]]):
         self.transform = transform
         self.target_transform = target_transform
         self.ids: List[str] = []
-        self.test_ids: List[str] = []
         self.id_to_label: Dict[str, int] = {}
         with open(training_labels_file(data_dir)) as id_label_file:
             for id_label in id_label_file:
@@ -46,11 +75,6 @@ class GwDataset(Dataset[Tuple[Tensor, Tensor]]):
                     self.id_to_label[_id] = int(label)
                     if n and len(self.ids) >= n:
                         break
-        with open(sample_submission_file(data_dir)) as test_id_label_file:
-            for id_label in test_id_label_file:
-                _id, _ = id_label.split(",")
-                if _id != "id":
-                    self.test_ids.append(_id)
         preprocessor_name = preprocessors[0].name
         self.data_name = (
             preprocessor_name
@@ -70,19 +94,12 @@ class GwDataset(Dataset[Tuple[Tensor, Tensor]]):
 
         return x, y
 
-    def get_test_id(self, idx: int) -> Tensor:
-        _id = self.test_ids[idx]
-        fpath = str(test_file(self.data_dir, _id, self.data_name))
-
-        x = self.transform(np.load(fpath))
-        return x
-
-
 @dataclass
 class MyDatasets:
     gw: GwDataset
     train: Subset[Tuple[Tensor, Tensor]]
     validation: Subset[Tuple[Tensor, Tensor]]
+    test: GwSubmissionDataset
 
 
 def gw_train_and_test_datasets(
@@ -105,11 +122,12 @@ def gw_train_and_test_datasets(
         transform=transform,
         target_transform=target_transform,
     )
+    gw_test = GwDataset(data_dir, preprocessors, transform=transform)
     num_examples = len(gw)
     num_train_examples = int(num_examples * 0.8)
     num_validation_examples = num_examples - num_train_examples
     train, validation = random_split(gw, [num_train_examples, num_validation_examples])
-    return MyDatasets(gw, train, validation)
+    return MyDatasets(gw, train, validation, gw_test)
 
 
 TRAIN_LOGGING_INTERVAL = 30
@@ -166,7 +184,7 @@ class ModelManager(ABC):
                 interval_train_loss = 0.0
 
     # noinspection PyCallingNonCallable
-    def _test(
+    def _validate(
         self,
         epoch,
         model: nn.Module,
@@ -233,6 +251,19 @@ class ModelManager(ABC):
             }
         )
 
+    def _test(
+        self,
+        model: nn.Module,
+        gw_test: GwSubmissionDataset,
+    ):
+        num_test_examples = len(gw_test.ids)
+        with open("submissions.csv", "w"):
+            for i in range(num_test_examples):
+                x = gw_test.ids[i]
+                # add batch dimension
+                x = torch.unsqueeze(x, 0)
+                pred = model(x)
+
     def _train(
         self,
         model: nn.Module,
@@ -256,7 +287,7 @@ class ModelManager(ABC):
             self._train_epoch(
                 model, loss_fn, train_dataloader, len(data.train), optimizer
             )
-            self._test(epoch, model, loss_fn, validation_dataloader, len(data.validation))
+            self._validate(epoch, model, loss_fn, validation_dataloader, len(data.validation))
 
         confusion_sample_indices = (
             random.sample(data.validation.indices, SAMPLES_TO_CHECK)
@@ -301,12 +332,7 @@ class ModelManager(ABC):
         pickle.dump(model, open(filename, "wb"))
 
         if prep_test_data: # we want to prepare test data
-            with open("submissions.csv", "w"):
-                for _id in data.gw.test_ids:
-                    x = data.gw.get_test_id(_id)
-                    # add batch dimension
-                    x = torch.unsqueeze(x, 0)
-                    pred = model(x)
+            self._test(model, data.gw_test)
 
         print("Done!")
 
