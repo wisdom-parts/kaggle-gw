@@ -30,9 +30,10 @@ class Args:
         default=None,
         help="number of training examples to use",
     )
-    prep_data_for_submission: bool = arg(
+    prep_data_for_submission: Optional[int] = arg(
         aliases=["-ps"],
-        default=False,
+        choices=[0, 1], # 1 indicates we want to prep data and 0 otherwise.
+        default=0,
         help="flag to indicate if prep data for submission",
     )
 
