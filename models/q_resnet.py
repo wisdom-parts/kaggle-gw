@@ -159,7 +159,7 @@ class Manager(ModelManager):
         n: Optional[int],
         device: torch.device,
         hp: HyperParameters,
-        prep_test_data: bool
+        prep_test_data: Optional[int]
     ):
         if not isinstance(hp, QResnetHp):
             raise ValueError("wrong hyper-parameter class: {hp}")

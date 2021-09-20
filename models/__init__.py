@@ -32,11 +32,17 @@ class GwSubmissionDataset(Dataset[Tuple[Tensor]]):
         self.data_dir = data_dir
         self.transform = transform
         self.ids: List[str] = []
+        preprocessor_name = preprocessors[0].name
         with open(sample_submission_file(data_dir)) as test_id_label_file:
             for id_label in test_id_label_file:
                 _id, _ = id_label.split(",")
                 if _id != "id":
                     self.ids.append(_id)
+        self.data_name = (
+            preprocessor_name
+            if test_file(data_dir, self.ids[0], preprocessor_name).exists()
+            else None
+        )
 
     def __len__(self):
         return len(self.ids)
@@ -144,7 +150,7 @@ class ModelManager(ABC):
         n: Optional[int],
         device: torch.device,
         hp: "HyperParameters",
-        prep_test_data: bool,
+        prep_test_data: Optional[int],
     ):
         pass
 
@@ -264,7 +270,7 @@ class ModelManager(ABC):
             csvwriter.writerow(fields)
             for i in range(num_test_examples):
                 _id = gw_test.ids[i]
-                x = gw_test[_id]
+                x = gw_test[i]
                 # add batch dimension
                 x = torch.unsqueeze(x, 0)
                 pred = model(x)
@@ -289,7 +295,7 @@ class ModelManager(ABC):
         n: Optional[int],
         preprocessors: List[PreprocessorMeta],
         hp: "HyperParameters",
-        prep_test_data: bool,
+        prep_test_data: Optional[int],
     ):
         data = gw_train_and_test_datasets(data_dir, n, preprocessors, hp.dtype, device)
         model.to(device, dtype=hp.dtype)
@@ -343,8 +349,8 @@ class ModelManager(ABC):
         print("Confusion matrix sample:")
         print(repr(confusion_sample))
         self._store_the_model(model)
-        if prep_test_data: # we want to prepare test data
-            self._test(model, data.gw_test)
+        if prep_test_data and prep_test_data == 1: # we want to prepare test data
+            self._test(model, data.test)
 
         print("Done!")
 
@@ -362,7 +368,7 @@ class HyperParameters:
 
 
 def train_model(
-    manager: ModelManager, data_dir: Path, n: Optional[int], hp: HyperParameters, prep_test_data: bool
+    manager: ModelManager, data_dir: Path, n: Optional[int], hp: HyperParameters, prep_test_data: Optional[int]
 ):
     validate_source_dir(data_dir)
 
