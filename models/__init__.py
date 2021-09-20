@@ -278,9 +278,9 @@ class ModelManager(ABC):
             Dump the model as a pickle file into the local disk.
         """
         cur_time = datetime.datetime.now()
-        timestamp = cur_time.strftime("%m%d%Y (%H:%M:%S)")
-        filename = f"{timestamp}_model.pkl"
-        pickle.dump(model, open(filename, "wb"))
+        timestamp = cur_time.strftime("%m%d%Y_%H:%M:%S")
+        filename = f"{timestamp}_model.pt"
+        torch.save(model.state_dict(), filename)
         print (f"Latest model has been stored as {filename}")
 
     def _train(
