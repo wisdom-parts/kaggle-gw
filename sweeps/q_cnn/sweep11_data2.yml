@@ -18,10 +18,10 @@ parameters:
   batch:
     value: 256
   lr:
-    min: 0.005
-    max: 0.03
+    min: 0.01
+    max: 0.06
   epochs:
-    value: 2
+    value: 3
   convlayers:
     min: 2
     max: 4
