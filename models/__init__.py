@@ -124,7 +124,7 @@ def gw_train_and_test_datasets(
         transform=transform,
         target_transform=target_transform,
     )
-    gw_test = GwDataset(data_dir, preprocessors, transform=transform)
+    gw_test = GwSubmissionDataset(data_dir, preprocessors, transform=transform)
     num_examples = len(gw)
     num_train_examples = int(num_examples * 0.8)
     num_validation_examples = num_examples - num_train_examples
