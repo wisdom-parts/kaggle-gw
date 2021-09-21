@@ -13,8 +13,11 @@ from torch.utils.data import Dataset, random_split, DataLoader, Subset
 from sklearn.metrics import roc_auc_score
 
 from gw_data import training_labels_file, train_file, validate_source_dir, DATA_VERSION
-from models.q_cnn import QCnnHp
 from preprocessor_meta import PreprocessorMeta
+
+
+def to_odd(i: int) -> int:
+    return (i // 2) * 2 + 1
 
 
 class GwDataset(Dataset[Tuple[Tensor, Tensor]]):
@@ -314,8 +317,10 @@ class RegressionHead(Enum):
     AVG_LINEAR = auto()
 
 
-def to_odd(i: int) -> int:
-    return (i // 2) * 2 + 1
+class HpWithRegressionHead(HyperParameters):
+    linear1drop: float = 0.2
+    linear1out: int = 64  # if this value is 1, then omit linear2
+    head: RegressionHead = RegressionHead.LINEAR
 
 
 class MaxHead2d(nn.Module):
@@ -330,7 +335,10 @@ class MaxHead2d(nn.Module):
     # We standardize init parameters for regression heads to make it simpler to construct the one you want.
     # noinspection PyUnusedLocal
     def __init__(
-        self, device: torch.device, hp: QCnnHp, input_shape: Tuple[int, int, int]
+        self,
+        device: torch.device,
+        hp: HpWithRegressionHead,
+        input_shape: Tuple[int, int, int],
     ):
         super().__init__()
 
@@ -356,7 +364,10 @@ class LinearHead2d(nn.Module):
     # We standardize init parameters for regression heads to make it simpler to construct the one you want.
     # noinspection PyUnusedLocal
     def __init__(
-        self, device: torch.device, hp: QCnnHp, input_shape: Tuple[int, int, int]
+        self,
+        device: torch.device,
+        hp: HpWithRegressionHead,
+        input_shape: Tuple[int, int, int],
     ):
         super().__init__()
         self.hp = hp
@@ -400,9 +411,3 @@ class LinearHead2d(nn.Module):
 
         assert out.size() == (batch_size, 1)
         return out
-
-
-class HpWithRegressionHead(HyperParameters):
-    linear1drop: float = 0.2
-    linear1out: int = 64  # if this value is 1, then omit linear2
-    head: RegressionHead = RegressionHead.LINEAR
