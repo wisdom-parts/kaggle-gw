@@ -276,7 +276,10 @@ class ModelManager(ABC):
                 # add batch dimension
                 x = torch.unsqueeze(x, 0)
                 pred = model(x)
-                csvwriter.writerow([_id, pred])
+                m = torch.nn.Sigmoid()
+                op = m(pred).data.cpu().numpy()[0]
+                pred_val = 0 if op <= 0.5 else 1
+                csvwriter.writerow([_id, pred_val])
         print ("Finished writing to submissions.csv!")
 
     def _store_the_model(self, model: nn.Module):
