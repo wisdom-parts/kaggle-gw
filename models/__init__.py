@@ -308,7 +308,7 @@ def train_model(
     manager.train(data_dir, n, device, hp)
 
 
-class RegressionHead2d(Enum):
+class RegressionHead(Enum):
     LINEAR = auto()
     MAX = auto()
     AVG_LINEAR = auto()
@@ -318,7 +318,7 @@ def to_odd(i: int) -> int:
     return (i // 2) * 2 + 1
 
 
-class MaxHead(nn.Module):
+class MaxHead2d(nn.Module):
     """
     Consumes the output of Cnn (channel, h, w) with no final activation
     and returns the maximum across all outputs for each example
@@ -327,6 +327,8 @@ class MaxHead(nn.Module):
 
     apply_activation_before_input = False
 
+    # We standardize init parameters for regression heads to make it simpler to construct the one you want.
+    # noinspection PyUnusedLocal
     def __init__(
         self, device: torch.device, hp: QCnnHp, input_shape: Tuple[int, int, int]
     ):
@@ -341,7 +343,7 @@ class MaxHead(nn.Module):
         return out
 
 
-class LinearHead(nn.Module):
+class LinearHead2d(nn.Module):
     """
     Consumes the output of Cnn (channel, h, w) with a final activation and
     applies one or two linear layers to produce a single logit with no final activation.
@@ -351,6 +353,8 @@ class LinearHead(nn.Module):
 
     apply_activation_before_input = True
 
+    # We standardize init parameters for regression heads to make it simpler to construct the one you want.
+    # noinspection PyUnusedLocal
     def __init__(
         self, device: torch.device, hp: QCnnHp, input_shape: Tuple[int, int, int]
     ):
@@ -359,7 +363,7 @@ class LinearHead(nn.Module):
 
         linear_input_features = input_shape[0] * (
             1
-            if hp.head == RegressionHead2d.AVG_LINEAR
+            if hp.head == RegressionHead.AVG_LINEAR
             else input_shape[1] * input_shape[2]
         )
 
@@ -367,7 +371,7 @@ class LinearHead(nn.Module):
             in_features=linear_input_features,
             out_features=hp.linear1out,
         )
-        self.lin1_dropout = nn.Dropout(p=self.hp.linear1drop)
+        self.lin1_dropout = nn.Dropout(p=hp.linear1drop)
 
         self.activation = nn.ReLU()
         if hp.linear1out > 1:
@@ -380,7 +384,7 @@ class LinearHead(nn.Module):
     def forward(self, x: Tensor) -> Tensor:
         batch_size = x.size()[0]
 
-        if self.hp.head == RegressionHead2d.AVG_LINEAR:
+        if self.hp.head == RegressionHead.AVG_LINEAR:
             # Average across h and w, leaving (batch, channels)
             out = torch.mean(x, dim=[2, 3])
         else:
@@ -396,3 +400,9 @@ class LinearHead(nn.Module):
 
         assert out.size() == (batch_size, 1)
         return out
+
+
+class HpWithRegressionHead(HyperParameters):
+    linear1drop: float = 0.2
+    linear1out: int = 64  # if this value is 1, then omit linear2
+    head: RegressionHead = RegressionHead.LINEAR

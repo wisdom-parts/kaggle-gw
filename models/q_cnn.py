@@ -11,63 +11,63 @@ from preprocessor_meta import Preprocessor, PreprocessorMeta
 from models import (
     HyperParameters,
     ModelManager,
-    RegressionHead2d,
+    RegressionHead,
     to_odd,
-    MaxHead,
-    LinearHead,
+    MaxHead2d,
+    LinearHead2d,
+    HpWithRegressionHead,
 )
 
 
 @argsclass(name="q_cnn")
 @dataclass
-class QCnnHp(HyperParameters):
-    batch: int = 512
-    epochs: int = 3
-    lr: float = 0.0005
+class QCnnHp(HpWithRegressionHead):
+    batch: int = 256
+    epochs: int = 1
+    lr: float = 0.025
     dtype: torch.dtype = torch.float32
+
+    linear1drop: float = 0.2
+    linear1out: int = 64  # if this value is 1, then omit linear2
+    head: RegressionHead = RegressionHead.LINEAR
 
     preprocessor: Preprocessor = Preprocessor.QTRANSFORM
 
-    convlayers: int = 4
+    convlayers: int = 3
 
-    conv1h: int = 33
-    conv1w: int = 7
+    conv1h: int = 49
+    conv1w: int = 17
     conv1strideh: int = 1
     conv1stridew: int = 1
-    conv1out: int = 10
+    conv1out: int = 73
     mp1h: int = 2
     mp1w: int = 2
 
     conv2h: int = 17
-    conv2w: int = 65
+    conv2w: int = 97
     conv2strideh: int = 1
     conv2stridew: int = 1
-    conv2out: int = 100
+    conv2out: int = 76
     mp2h: int = 2
     mp2w: int = 2
 
-    conv3h: int = 9
-    conv3w: int = 16
+    conv3h: int = 17
+    conv3w: int = 5
     conv3strideh: int = 1
     conv3stridew: int = 1
-    conv3out: int = 30
+    conv3out: int = 80
     mp3h: int = 2
     mp3w: int = 2
 
-    conv4h: int = 5
-    conv4w: int = 9
+    conv4h: int = 3
+    conv4w: int = 5
     conv4strideh: int = 1
     conv4stridew: int = 1
-    conv4out: int = 100
+    conv4out: int = 20
     mp4h: int = 2
     mp4w: int = 2
 
-    convdrop: float = 0.5
-
-    head: RegressionHead2d = RegressionHead2d.MAX
-
-    linear1out: int = 50  # if this value is 1, then omit linear2
-    linear1drop: float = 0.4
+    convdrop: float = 0.3
 
     @property
     def manager_class(self) -> Type[ModelManager]:
@@ -243,8 +243,8 @@ class Manager(ModelManager):
 
         wandb.init(project="g2net-" + __name__, entity="wisdom", config=asdict(hp))
 
-        head_class: Union[Type[MaxHead], Type[LinearHead]] = (
-            MaxHead if hp.head == RegressionHead2d.MAX else LinearHead
+        head_class: Union[Type[MaxHead2d], Type[LinearHead2d]] = (
+            MaxHead2d if hp.head == RegressionHead.MAX else LinearHead2d
         )
         cnn = Cnn(device, hp, head_class.apply_activation_before_input)
         head = head_class(device, hp, cnn.output_shape)
