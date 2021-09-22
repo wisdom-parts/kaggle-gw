@@ -323,9 +323,9 @@ class HpWithRegressionHead(HyperParameters):
     head: RegressionHead = RegressionHead.LINEAR
 
 
-class MaxHead2d(nn.Module):
+class MaxHead(nn.Module):
     """
-    Consumes the output of Cnn (channel, h, w) with no final activation
+    Consumes the output of Cnn (channel, w) or (channel, h, w) with no final activation
     and returns the maximum across all outputs for each example
     to produce a single logit with no final activation.
     """
@@ -338,7 +338,7 @@ class MaxHead2d(nn.Module):
         self,
         device: torch.device,
         hp: HpWithRegressionHead,
-        input_shape: Tuple[int, int, int],
+        input_shape: Tuple[int, ...],
     ):
         super().__init__()
 
@@ -351,12 +351,12 @@ class MaxHead2d(nn.Module):
         return out
 
 
-class LinearHead2d(nn.Module):
+class LinearHead(nn.Module):
     """
-    Consumes the output of Cnn (channel, h, w) with a final activation and
+    Consumes the output of Cnn (channel, w) or (channel, h, w) with a final activation and
     applies one or two linear layers to produce a single logit with no final activation.
     If hp.head == RegressionHead.AVG_LINEAR, then this module first
-    takes the average across (h, w).
+    takes the average across (w) or (h, w).
     """
 
     apply_activation_before_input = True
@@ -367,15 +367,21 @@ class LinearHead2d(nn.Module):
         self,
         device: torch.device,
         hp: HpWithRegressionHead,
-        input_shape: Tuple[int, int, int],
+        input_shape: Tuple[int, ...],
     ):
+        """
+        :param input_shape: (channel, w) or (channel, h, w)
+        """
         super().__init__()
+        if len(input_shape) not in (2, 3):
+            raise ValueError(f"input shape must have length 2 or 3, was {input_shape}")
+
         self.hp = hp
 
+        spacial_size = input_shape[1] * (1 if len(input_shape) == 2 else input_shape[2])
+
         linear_input_features = input_shape[0] * (
-            1
-            if hp.head == RegressionHead.AVG_LINEAR
-            else input_shape[1] * input_shape[2]
+            1 if hp.head == RegressionHead.AVG_LINEAR else spacial_size
         )
 
         self.linear1 = nn.Linear(
@@ -394,10 +400,12 @@ class LinearHead2d(nn.Module):
 
     def forward(self, x: Tensor) -> Tensor:
         batch_size = x.size()[0]
+        spacial_len = len(x.size()) - 2
 
         if self.hp.head == RegressionHead.AVG_LINEAR:
-            # Average across h and w, leaving (batch, channels)
-            out = torch.mean(x, dim=[2, 3])
+            # Average across spacial dimensions, leaving (batch, channels)
+            spacial_dims = [2] if spacial_len == 1 else [2, 3]
+            out = torch.mean(x, dim=spacial_dims)
         else:
             out = torch.flatten(x, start_dim=1)
 

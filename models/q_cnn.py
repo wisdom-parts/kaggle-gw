@@ -13,8 +13,8 @@ from models import (
     ModelManager,
     RegressionHead,
     to_odd,
-    MaxHead2d,
-    LinearHead2d,
+    MaxHead,
+    LinearHead,
     HpWithRegressionHead,
 )
 
@@ -67,7 +67,7 @@ class QCnnHp(HpWithRegressionHead):
     mp4h: int = 2
     mp4w: int = 2
 
-    convdrop: float = 0.3
+    convdrop: float = 0.0  # Unused (oops)
 
     @property
     def manager_class(self) -> Type[ModelManager]:
@@ -132,7 +132,7 @@ class ConvBlock(nn.Module):
 class Cnn(nn.Module):
     """
     Applies a CNN to qtransform data and produces an output shaped like
-    (batch, channels, height, width). The size of the output depends on
+    (batch, channels, height, width). Dimension sizes depend on
     hyper-parameters.
     """
 
@@ -186,8 +186,6 @@ class Cnn(nn.Module):
                 mp_size=(hp.mp4h, hp.mp4w),
             )
             self.conv_out_size = self.cb4.out_size(self.conv_out_size)
-
-        self.conv_dropout = nn.Dropout(p=self.hp.convdrop)
 
         self.conv_out_features = (
             hp.conv1out
@@ -243,8 +241,8 @@ class Manager(ModelManager):
 
         wandb.init(project="g2net-" + __name__, entity="wisdom", config=asdict(hp))
 
-        head_class: Union[Type[MaxHead2d], Type[LinearHead2d]] = (
-            MaxHead2d if hp.head == RegressionHead.MAX else LinearHead2d
+        head_class: Union[Type[MaxHead], Type[LinearHead]] = (
+            MaxHead if hp.head == RegressionHead.MAX else LinearHead
         )
         cnn = Cnn(device, hp, head_class.apply_activation_before_input)
         head = head_class(device, hp, cnn.output_shape)
