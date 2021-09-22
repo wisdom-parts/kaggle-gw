@@ -150,7 +150,7 @@ class ModelManager(ABC):
         n: Optional[int],
         device: torch.device,
         hp: "HyperParameters",
-        prep_test_data: Optional[int],
+        submission: Optional[int],
     ):
         pass
 
@@ -285,8 +285,8 @@ class ModelManager(ABC):
             Dump the model as a pickle file into the local disk.
         """
         cur_time = datetime.datetime.now()
-        timestamp = cur_time.strftime("%m%d%Y_%H:%M:%S")
-        filename = f"{timestamp}_model.pt"
+        timestamp = cur_time.strftime("%Y%d%m_%H:%M:%S")
+        filename = f"model_{timestamp}.pt"
         torch.save(model.state_dict(), filename)
         print (f"Latest model has been stored as {filename}")
 
@@ -298,7 +298,7 @@ class ModelManager(ABC):
         n: Optional[int],
         preprocessors: List[PreprocessorMeta],
         hp: "HyperParameters",
-        prep_test_data: Optional[int],
+        submission: Optional[int],
     ):
         data = gw_train_and_test_datasets(data_dir, n, preprocessors, hp.dtype, device)
         model.to(device, dtype=hp.dtype)
@@ -352,7 +352,7 @@ class ModelManager(ABC):
         print("Confusion matrix sample:")
         print(repr(confusion_sample))
         self._store_the_model(model)
-        if prep_test_data and prep_test_data == 1: # we want to prepare test data
+        if submission and submission == 1: # we want to prepare test data
             self._test(model, data.test)
 
         print("Done!")
@@ -371,7 +371,7 @@ class HyperParameters:
 
 
 def train_model(
-    manager: ModelManager, data_dir: Path, n: Optional[int], hp: HyperParameters, prep_test_data: Optional[int]
+    manager: ModelManager, data_dir: Path, n: Optional[int], hp: HyperParameters, submission: Optional[int]
 ):
     validate_source_dir(data_dir)
 
@@ -379,4 +379,4 @@ def train_model(
     print(f"Using device {device_name}")
     device = torch.device(device_name)
 
-    manager.train(data_dir, n, device, hp, prep_test_data)
+    manager.train(data_dir, n, device, hp, submission)

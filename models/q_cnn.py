@@ -312,7 +312,7 @@ class Manager(ModelManager):
         n: Optional[int],
         device: torch.device,
         hp: HyperParameters,
-        prep_test_data: Optional[int],
+        submission: Optional[int],
     ):
         if not isinstance(hp, QCnnHp):
             raise ValueError("wrong hyper-parameter class: {hp}")
@@ -326,4 +326,4 @@ class Manager(ModelManager):
         head = head_class(device, hp, cnn.output_shape)
         model = Model(cnn, head)
 
-        self._train(model, device, data_dir, n, [hp.preprocessor.value], hp, prep_test_data)
+        self._train(model, device, data_dir, n, [hp.preprocessor.value], hp, submission)
