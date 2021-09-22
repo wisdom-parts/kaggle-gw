@@ -4,11 +4,11 @@ import numpy as np
 from pycbc.types import TimeSeries
 from scipy.signal.windows import tukey
 
-from gw_data import DELTA_T, N_SIGNALS
+from gw_data import SIGNAL_DELTA_T, N_SIGNALS
 
 
 def timeseries_from_signal(sig: np.ndarray) -> TimeSeries:
-    return TimeSeries(sig, epoch=0, delta_t=DELTA_T)
+    return TimeSeries(sig, epoch=0, delta_t=SIGNAL_DELTA_T)
 
 
 def timeseries_from_signals(sigs: np.ndarray) -> List[TimeSeries]:

@@ -1,0 +1,64 @@
+program: python
+command:
+  - ${program}
+  - -m
+  - model
+  - -n
+  - 50000
+  - q_cnn
+  - ${args}
+  - /home/ec2-user/data2-all
+method: bayes
+metric:
+  name: AUC
+  goal: maximize
+parameters:
+  preprocessor:
+    value: QTRANSFORM
+  batch:
+    value: 256
+  lr:
+    min: 0.01
+    max: 0.05
+  epochs:
+    value: 1
+  convlayers:
+    min: 3
+    max: 4
+  conv1h:
+    values: [33, 49, 65]
+  conv1w:
+    values: [1, 3, 17, 33, 49, 65, 97, 129]
+  conv1out:
+    min: 10
+    max: 100
+  conv2h:
+    values: [1, 3, 17, 33]
+  conv2w:
+    values: [33, 49, 65, 97, 129]
+  conv2out:
+    min: 10
+    max: 100
+  conv3h:
+    values: 17
+  conv3w:
+    values: [1, 3, 5, 7]
+  conv3out:
+    value: 80
+  conv4h:
+    values: [1, 3, 5, 7]
+  conv4w:
+    values: [1, 3, 5, 7]
+  conv4out:
+    values: [20, 30, 40]
+  linear1out:
+    min: 1
+    max: 100
+  convdrop:
+    min: 0.2
+    max: 0.4
+  linear1drop:
+    min: 0.2
+    max: 0.4
+  head:
+    values: LINEAR
