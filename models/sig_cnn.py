@@ -1,20 +1,21 @@
 from dataclasses import dataclass, asdict
-from enum import Enum, auto
-from typing import Type
+from typing import Type, Union
 
 import torch
 import wandb
 from datargs import argsclass
 from torch import nn, Tensor
 
-from preprocessor_meta import Preprocessor, filter_sig_meta
 from gw_data import *
-from models import HyperParameters, ModelManager
-
-
-class RegressionHead(Enum):
-    LINEAR = auto()
-    AVG_LINEAR = auto()
+from models import (
+    HyperParameters,
+    ModelManager,
+    MaxHead,
+    LinearHead,
+    HpWithRegressionHead,
+    RegressionHead,
+)
+from preprocessor_meta import filter_sig_meta
 
 
 def to_odd(i: int) -> int:
@@ -23,35 +24,35 @@ def to_odd(i: int) -> int:
 
 @argsclass(name="sig_cnn")
 @dataclass
-class SigCnnHp(HyperParameters):
-    batch: int = 512
-    epochs: int = 10
-    lr: float = 0.0003
+class SigCnnHp(HpWithRegressionHead):
+    batch: int = 250
+    epochs: int = 1
+    lr: float = 0.01
     dtype: torch.dtype = torch.float32
 
-    conv1w: int = 105
-    conv1out: int = 150
+    linear1drop: float = 0.2
+    linear1out: int = 64  # if this value is 1, then omit linear2
+    head: RegressionHead = RegressionHead.LINEAR
+
+    conv1w: int = 111
+    conv1out: int = 100
     conv1stride: int = 1
-    mp1w: int = 1
+    mp1w: int = 2
 
-    conv2w: int = 8
-    conv2out: int = 40
-    conv2stride: int = 1
-    mp2w: int = 4
+    conv2w: int = 7
+    conv2out: int = 50
+    conv2stride: int = 2
+    mp2w: int = 3
 
-    conv3w: int = 8
-    conv3out: int = 50
-    conv3stride: int = 1
-    mp3w: int = 1
+    conv3w: int = 15
+    conv3out: int = 70
+    conv3stride: int = 2
+    mp3w: int = 4
 
-    conv4w: int = 33
-    conv4out: int = 50
-    conv4stride: int = 1
-    mp4w: int = 3
-
-    head: RegressionHead = RegressionHead.AVG_LINEAR
-
-    lindrop: float = 0.22
+    conv4w: int = 43
+    conv4out: int = 70
+    conv4stride: int = 2
+    mp4w: int = 2
 
     @property
     def manager_class(self) -> Type[ModelManager]:
@@ -89,17 +90,20 @@ class ConvBlock(nn.Module):
         return out
 
 
-class SigCnn(nn.Module):
+class Cnn(nn.Module):
     """
-    Applies a CNN to the output of preprocess filter_sig and produces one logit as output.
-    input size: (batch_size, N_SIGNALS, SIGNAL_LEN)
-    output size: (batch_size, 1)
+    Applies a CNN to qtransform data and produces an output shaped like
+    (batch, channels, width). Dimension sizes depend on
+    hyper-parameters.
     """
 
-    def __init__(self, device: torch.device, hp: SigCnnHp):
+    def __init__(
+        self, device: torch.device, hp: SigCnnHp, apply_final_activation: bool
+    ):
         super().__init__()
-        self.hp = hp
         self.device = device
+        self.hp = hp
+        self.apply_final_activation = apply_final_activation
 
         self.conv1 = ConvBlock(
             w=hp.conv1w,
@@ -129,8 +133,8 @@ class SigCnn(nn.Module):
             stride=hp.conv4stride,
             mpw=hp.mp4w,
         )
-        self.outw = (
-            SIGNAL_LEN
+        outw = (
+            filter_sig_meta.output_shape[1]
             // hp.conv1stride
             // hp.mp1w
             // hp.conv2stride
@@ -140,34 +144,27 @@ class SigCnn(nn.Module):
             // hp.conv4stride
             // hp.mp4w
         )
-        if self.outw == 0:
+        wandb.log({"conv_out_width": outw})
+        if outw == 0:
             raise ValueError("strides and maxpools took output width to zero")
-        self.linear_dropout = nn.Dropout(hp.lindrop)
-        linear_in_features = hp.conv4out * (
-            self.outw if hp.head == RegressionHead.LINEAR else 1
-        )
-        self.linear = nn.Linear(in_features=linear_in_features, out_features=1)
+        self.output_shape = (hp.conv4out, outw)
 
     def forward(self, x: Tensor) -> Tensor:
-        batch_size = x.size()[0]
-
         out = self.conv1(x, use_activation=True)
         out = self.conv2(out, use_activation=True)
         out = self.conv3(out, use_activation=True)
-        out = self.conv4(out, use_activation=False)
-
-        if self.hp.head == RegressionHead.LINEAR:
-            out = torch.flatten(out, start_dim=1)
-        else:
-            assert self.hp.head == RegressionHead.AVG_LINEAR
-            # Average across w, leaving (batch, channels)
-            out = torch.mean(out, dim=2)
-
-        out = self.linear_dropout(out)
-        out = self.linear(out)
-        assert out.size() == (batch_size, 1)
-
+        out = self.conv4(out, use_activation=self.apply_final_activation)
         return out
+
+
+class Model(nn.Module):
+    def __init__(self, cnn: nn.Module, head: nn.Module):
+        super().__init__()
+        self.cnn = cnn
+        self.head = head
+
+    def forward(self, x: Tensor) -> Tensor:
+        return self.head(self.cnn(x))
 
 
 class Manager(ModelManager):
@@ -183,4 +180,12 @@ class Manager(ModelManager):
             raise ValueError("wrong hyper-parameter class: {hp}")
 
         wandb.init(project="g2net-" + __name__, entity="wisdom", config=asdict(hp))
-        self._train(SigCnn(device, hp), device, data_dir, n, [filter_sig_meta], hp, submission)
+
+        head_class: Union[Type[MaxHead], Type[LinearHead]] = (
+            MaxHead if hp.head == RegressionHead.MAX else LinearHead
+        )
+        cnn = Cnn(device, hp, head_class.apply_activation_before_input)
+        head = head_class(device, hp, cnn.output_shape)
+        model = Model(cnn, head)
+
+        self._train(model, device, data_dir, n, [filter_sig_meta], hp, submission)

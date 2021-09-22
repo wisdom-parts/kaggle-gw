@@ -41,3 +41,4 @@ if __name__ == "__main__":
     args = parse(Args)
     manager: ModelManager = args.model.manager_class()
     train_model(manager, args.data_dir, args.n, args.model, args.submission)
+

@@ -1,0 +1,34 @@
+program: python
+command:
+  - ${program}
+  - -m
+  - model
+  - -n
+  - 200000
+  - sig_cnn
+  - ${args}
+  - /home/ec2-user/filter_sig-all
+method: bayes
+metric:
+  goal: maximize
+  name: AUC
+parameters:
+  epochs:
+    value: 10
+  lr:
+    value: 0.001
+  conv1stride:
+    max: 80
+    min: 20
+  mp1w:
+    max: 2
+    min: 1
+  mp2w:
+    max: 2
+    min: 1
+  mp3w:
+    max: 2
+    min: 1
+  mp4w:
+    max: 2
+    min: 1
