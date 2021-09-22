@@ -55,12 +55,12 @@ class Manager(ModelManager):
         n: Optional[int],
         device: torch.device,
         hp: HyperParameters,
-        prep_test_data: Optional[int],
+        submission: Optional[int],
     ):
         if not isinstance(hp, QEfficientNetHp):
             raise ValueError("wrong hyper-parameter class: {hp}")
 
         wandb.init(project="g2net-" + __name__, entity="wisdom", config=asdict(hp))
         self._train(
-            EfficientNet(device, hp), device, data_dir, n, [qtransform_meta], hp, prep_test_data
+            EfficientNet(device, hp), device, data_dir, n, [qtransform_meta], hp, submission
         )

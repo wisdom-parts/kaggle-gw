@@ -105,9 +105,9 @@ class Manager(ModelManager):
         n: Optional[int],
         device: torch.device,
         hp: HyperParameters,
-        prep_test_data: Optional[int],
+        submission: Optional[int],
     ):
         if not isinstance(hp, SigRnnHp):
             raise ValueError("wrong hyper-parameter class: {hp}")
         wandb.init(project="g2net-" + __name__, config=asdict(hp))
-        self._train(Rnn(device, hp), device, data_dir, n, [filter_sig_meta], hp, prep_test_data)
+        self._train(Rnn(device, hp), device, data_dir, n, [filter_sig_meta], hp, submission)
