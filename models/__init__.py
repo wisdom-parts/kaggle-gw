@@ -17,42 +17,6 @@ from sklearn.metrics import roc_auc_score
 from gw_data import training_labels_file, train_file, validate_source_dir, sample_submission_file, test_file
 from preprocessor_meta import PreprocessorMeta
 
-class GwSubmissionDataset(Dataset[Tuple[Tensor]]):
-    """
-    Represents the test data of the g2net data directory as Tensors.
-    """
-    def __init__(
-        self,
-        data_dir: Path,
-        preprocessors: List[PreprocessorMeta],
-        transform: Callable[[np.ndarray], Tensor],
-    ):
-        if len(preprocessors) > 1:
-            raise ValueError("multiple data names not yet supported")
-        self.data_dir = data_dir
-        self.transform = transform
-        self.ids: List[str] = []
-        preprocessor_name = preprocessors[0].name
-        with open(sample_submission_file(data_dir)) as test_id_label_file:
-            for id_label in test_id_label_file:
-                _id, _ = id_label.split(",")
-                if _id != "id":
-                    self.ids.append(_id)
-        self.data_name = (
-            preprocessor_name
-            if test_file(data_dir, self.ids[0], preprocessor_name).exists()
-            else None
-        )
-
-    def __len__(self):
-        return len(self.ids)
-
-    def __getitem__(self, idx: int) -> Tensor:
-        _id = self.ids[idx]
-        fpath = str(test_file(self.data_dir, _id, self.data_name))
-
-        x = self.transform(np.load(fpath))
-        return x
 
 def to_odd(i: int) -> int:
     return (i // 2) * 2 + 1
