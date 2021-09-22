@@ -1,6 +1,7 @@
 import random
 from abc import abstractmethod, ABC
 from dataclasses import dataclass
+from enum import Enum, auto
 from pathlib import Path
 from typing import Optional, Callable, List, Dict, Tuple, Type
 
@@ -13,6 +14,10 @@ from sklearn.metrics import roc_auc_score
 
 from gw_data import training_labels_file, train_file, validate_source_dir, DATA_VERSION
 from preprocessor_meta import PreprocessorMeta
+
+
+def to_odd(i: int) -> int:
+    return (i // 2) * 2 + 1
 
 
 class GwDataset(Dataset[Tuple[Tensor, Tensor]]):
@@ -304,3 +309,113 @@ def train_model(
     device = torch.device(device_name)
 
     manager.train(data_dir, n, device, hp)
+
+
+class RegressionHead(Enum):
+    LINEAR = auto()
+    MAX = auto()
+    AVG_LINEAR = auto()
+
+
+class HpWithRegressionHead(HyperParameters):
+    linear1drop: float = 0.2
+    linear1out: int = 64  # if this value is 1, then omit linear2
+    head: RegressionHead = RegressionHead.LINEAR
+
+
+class MaxHead(nn.Module):
+    """
+    Consumes the output of Cnn (channel, w) or (channel, h, w) with no final activation
+    and returns the maximum across all outputs for each example
+    to produce a single logit with no final activation.
+    """
+
+    apply_activation_before_input = False
+
+    # We standardize init parameters for regression heads to make it simpler to construct the one you want.
+    # noinspection PyUnusedLocal
+    def __init__(
+        self,
+        device: torch.device,
+        hp: HpWithRegressionHead,
+        input_shape: Tuple[int, ...],
+    ):
+        super().__init__()
+
+    # noinspection PyMethodMayBeStatic
+    def forward(self, x: Tensor) -> Tensor:
+        batch_size = x.size()[0]
+        out = torch.flatten(x, start_dim=1)
+        out = torch.amax(out, dim=1, keepdim=True)
+        assert out.size() == (batch_size, 1)
+        return out
+
+
+class LinearHead(nn.Module):
+    """
+    Consumes the output of Cnn (channel, w) or (channel, h, w) with a final activation and
+    applies one or two linear layers to produce a single logit with no final activation.
+    If hp.head == RegressionHead.AVG_LINEAR, then this module first
+    takes the average across (w) or (h, w).
+    """
+
+    apply_activation_before_input = True
+
+    # We standardize init parameters for regression heads to make it simpler to construct the one you want.
+    # noinspection PyUnusedLocal
+    def __init__(
+        self,
+        device: torch.device,
+        hp: HpWithRegressionHead,
+        input_shape: Tuple[int, ...],
+    ):
+        """
+        :param input_shape: (channel, w) or (channel, h, w)
+        """
+        super().__init__()
+        if len(input_shape) not in (2, 3):
+            raise ValueError(f"input shape must have length 2 or 3, was {input_shape}")
+
+        self.hp = hp
+
+        spacial_size = input_shape[1] * (1 if len(input_shape) == 2 else input_shape[2])
+
+        linear_input_features = input_shape[0] * (
+            1 if hp.head == RegressionHead.AVG_LINEAR else spacial_size
+        )
+
+        self.linear1 = nn.Linear(
+            in_features=linear_input_features,
+            out_features=hp.linear1out,
+        )
+        self.lin1_dropout = nn.Dropout(p=hp.linear1drop)
+
+        self.activation = nn.ReLU()
+        if hp.linear1out > 1:
+            self.bn = nn.BatchNorm1d(hp.linear1out)
+            self.linear2 = nn.Linear(
+                in_features=hp.linear1out,
+                out_features=1,
+            )
+
+    def forward(self, x: Tensor) -> Tensor:
+        batch_size = x.size()[0]
+        spacial_len = len(x.size()) - 2
+
+        if self.hp.head == RegressionHead.AVG_LINEAR:
+            # Average across spacial dimensions, leaving (batch, channels)
+            spacial_dims = [2] if spacial_len == 1 else [2, 3]
+            out = torch.mean(x, dim=spacial_dims)
+        else:
+            out = torch.flatten(x, start_dim=1)
+
+        out = self.linear1(out)
+        if self.hp.linear1out > 1:
+            out = self.bn(out)
+            out = self.activation(out)
+            if self.hp.linear1drop > 0.0:
+                out = self.lin1_dropout(out)
+            out = self.linear2(out)
+
+        assert out.size() == (batch_size, 1)
+        return out
