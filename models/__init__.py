@@ -359,7 +359,7 @@ class ModelManager(ABC):
         print("Confusion matrix sample:")
         print(repr(confusion_sample))
         self._store_the_model(model)
-        if submission and submission == 1:  # we want to prepare test data
+        if submission == 1:  # we want to prepare test data
             self._test(model, data.test)
 
         print("Done!")
