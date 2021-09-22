@@ -30,10 +30,9 @@ class Args:
         default=None,
         help="number of training examples to use",
     )
-    submission: Optional[int] = arg(
-        aliases=["-s"],
-        choices=[0, 1], # 1 indicates we want to prep data and 0 otherwise.
-        default=0,
+    prep_data_for_submission: Bool = arg(
+        aliases=["-ps"],
+        default=False,
         help="flag to indicate if prep data for submission",
     )
 
@@ -41,4 +40,4 @@ class Args:
 if __name__ == "__main__":
     args = parse(Args)
     manager: ModelManager = args.model.manager_class()
-    train_model(manager, args.data_dir, args.n, args.model, args.submission)
+    train_model(manager, args.data_dir, args.n, args.model, args.prep_data_for_submission)
