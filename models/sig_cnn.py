@@ -1,5 +1,4 @@
 from dataclasses import dataclass, asdict
-from enum import Enum, auto
 from typing import Type, Union
 
 import torch
@@ -26,7 +25,7 @@ def to_odd(i: int) -> int:
 @argsclass(name="sig_cnn")
 @dataclass
 class SigCnnHp(HpWithRegressionHead):
-    batch: int = 512
+    batch: int = 250
     epochs: int = 1
     lr: float = 0.01
     dtype: torch.dtype = torch.float32
@@ -35,27 +34,25 @@ class SigCnnHp(HpWithRegressionHead):
     linear1out: int = 64  # if this value is 1, then omit linear2
     head: RegressionHead = RegressionHead.LINEAR
 
-    convdrop: float = 0.2
-
-    conv1w: int = 105
-    conv1out: int = 150
+    conv1w: int = 111
+    conv1out: int = 100
     conv1stride: int = 1
-    mp1w: int = 1
+    mp1w: int = 2
 
-    conv2w: int = 8
-    conv2out: int = 40
-    conv2stride: int = 1
-    mp2w: int = 4
+    conv2w: int = 7
+    conv2out: int = 50
+    conv2stride: int = 2
+    mp2w: int = 3
 
-    conv3w: int = 8
-    conv3out: int = 50
-    conv3stride: int = 1
-    mp3w: int = 1
+    conv3w: int = 15
+    conv3out: int = 70
+    conv3stride: int = 2
+    mp3w: int = 4
 
-    conv4w: int = 33
-    conv4out: int = 50
-    conv4stride: int = 1
-    mp4w: int = 3
+    conv4w: int = 43
+    conv4out: int = 70
+    conv4stride: int = 2
+    mp4w: int = 2
 
     @property
     def manager_class(self) -> Type[ModelManager]:
@@ -136,7 +133,6 @@ class Cnn(nn.Module):
             stride=hp.conv4stride,
             mpw=hp.mp4w,
         )
-        self.conv_dropout = nn.Dropout(p=self.hp.convdrop)
         outw = (
             filter_sig_meta.output_shape[1]
             // hp.conv1stride
@@ -148,6 +144,7 @@ class Cnn(nn.Module):
             // hp.conv4stride
             // hp.mp4w
         )
+        wandb.log({"conv_out_width": outw})
         if outw == 0:
             raise ValueError("strides and maxpools took output width to zero")
         self.output_shape = (hp.conv4out, outw)
