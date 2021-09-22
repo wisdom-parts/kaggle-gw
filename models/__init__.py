@@ -1,3 +1,5 @@
+import csv
+import datetime
 import random
 from abc import abstractmethod, ABC
 from dataclasses import dataclass
@@ -19,6 +21,42 @@ from preprocessor_meta import PreprocessorMeta
 def to_odd(i: int) -> int:
     return (i // 2) * 2 + 1
 
+class GwSubmissionDataset(Dataset[Tuple[Tensor]]):
+    """
+    Represents the test data of the g2net data directory as Tensors.
+    """
+    def __init__(
+        self,
+        data_dir: Path,
+        preprocessors: List[PreprocessorMeta],
+        transform: Callable[[np.ndarray], Tensor],
+    ):
+        if len(preprocessors) > 1:
+            raise ValueError("multiple data names not yet supported")
+        self.data_dir = data_dir
+        self.transform = transform
+        self.ids: List[str] = []
+        preprocessor_name = preprocessors[0].name
+        with open(sample_submission_file(data_dir)) as test_id_label_file:
+            for id_label in test_id_label_file:
+                _id, _ = id_label.split(",")
+                if _id != "id":
+                    self.ids.append(_id)
+        self.data_name = (
+            preprocessor_name
+            if test_file(data_dir, self.ids[0], preprocessor_name).exists()
+            else None
+        )
+
+    def __len__(self):
+        return len(self.ids)
+
+    def __getitem__(self, idx: int) -> Tensor:
+        _id = self.ids[idx]
+        fpath = str(test_file(self.data_dir, _id, self.data_name))
+
+        x = self.transform(np.load(fpath))
+        return x
 
 class GwDataset(Dataset[Tuple[Tensor, Tensor]]):
     """
@@ -72,7 +110,8 @@ class GwDataset(Dataset[Tuple[Tensor, Tensor]]):
 class MyDatasets:
     gw: GwDataset
     train: Subset[Tuple[Tensor, Tensor]]
-    test: Subset[Tuple[Tensor, Tensor]]
+    validation: Subset[Tuple[Tensor, Tensor]]
+    test: GwSubmissionDataset
 
 
 def gw_train_and_test_datasets(
@@ -95,11 +134,12 @@ def gw_train_and_test_datasets(
         transform=transform,
         target_transform=target_transform,
     )
+    test = GwSubmissionDataset(data_dir, preprocessors, transform=transform)
     num_examples = len(gw)
     num_train_examples = int(num_examples * 0.8)
-    num_test_examples = num_examples - num_train_examples
-    train, test = random_split(gw, [num_train_examples, num_test_examples])
-    return MyDatasets(gw, train, test)
+    num_validation_examples = num_examples - num_train_examples
+    train, validation = random_split(gw, [num_train_examples, num_validation_examples])
+    return MyDatasets(gw, train, validation, test)
 
 
 TRAIN_LOGGING_INTERVAL = 30
@@ -154,8 +194,40 @@ class ModelManager(ABC):
                 )
                 interval_train_loss = 0.0
 
-    # noinspection PyCallingNonCallable
     def _test(
+            self,
+            model: nn.Module,
+            test: GwSubmissionDataset,
+    ):
+        num_test_examples = len(test.ids)
+        fields = ['id', 'target']
+        with open("submissions.csv", "w") as csvfile:
+            csvwriter = csv.writer(csvfile)
+            csvwriter.writerow(fields)
+            for i in range(num_test_examples):
+                _id = test.ids[i]
+                x = test[i]
+                # add batch dimension
+                x = torch.unsqueeze(x, 0)
+                pred = model(x)
+                m = torch.nn.Sigmoid()
+                op = m(pred).data.cpu().numpy()[0]
+                pred_val = 0 if op <= 0.5 else 1
+                csvwriter.writerow([_id, pred_val])
+        print("Finished writing to submissions.csv!")
+
+    def _store_the_model(self, model: nn.Module):
+        """
+            Save the model as a state dict.
+        """
+        cur_time = datetime.datetime.now()
+        timestamp = cur_time.strftime("%Y%d%m_%H:%M:%S")
+        filename = f"model_{timestamp}.pt"
+        torch.save(model.state_dict(), filename)
+        print (f"Latest model has been stored as {filename}")
+
+    # noinspection PyCallingNonCallable
+    def _validate(
         self,
         epoch,
         model: nn.Module,
@@ -165,7 +237,7 @@ class ModelManager(ABC):
     ):
         model.eval()
         num_batches = len(dataloader)
-        test_loss = 0.0
+        validation_loss = 0.0
         correct = 0.0
         zero_pred = 0.0
         fp = 0.0
@@ -188,7 +260,7 @@ class ModelManager(ABC):
                 else:
                     y_all = y.cpu().data.numpy()
 
-                test_loss += loss.item()
+                validation_loss += loss.item()
 
                 correct += torch.sum(torch.eq(pred > 0.0, y > 0.0)).item()
 
@@ -201,17 +273,17 @@ class ModelManager(ABC):
                 tn += torch.sum(torch.bitwise_and(pred < 0.0, y == 0)).item()
                 fn += torch.sum(torch.bitwise_and(pred < 0.0, y == 1)).item()
 
-        test_loss /= num_batches
-        test_accuracy = 100.0 * correct / num_examples
+        validation_loss /= num_batches
+        validation_accuracy = 100.0 * correct / num_examples
         auc_score = roc_auc_score(y_all, pred_all)
         print(
-            f"----\ntest metrics: Accuracy: {test_accuracy:>0.1f}%, Avg loss: {test_loss:>8f} \n"
+            f"----\nvalidation metrics: Accuracy: {validation_accuracy:>0.1f}%, Avg loss: {validation_loss:>8f} \n"
         )
         wandb.log(
             {
                 "epoch": epoch + 1,
-                "test_loss": test_loss,
-                "test_accuracy": test_accuracy,
+                "validation_loss": validation_loss,
+                "validation_accuracy": validation_accuracy,
                 "zero_pred": zero_pred,
                 "TP": tp,
                 "FP": fp,
@@ -230,6 +302,7 @@ class ModelManager(ABC):
         n: Optional[int],
         preprocessors: List[PreprocessorMeta],
         hp: "HyperParameters",
+        submission: Optional[int],
     ):
         data = gw_train_and_test_datasets(data_dir, n, preprocessors, hp.dtype, device)
         model.to(device, dtype=hp.dtype)
@@ -237,7 +310,7 @@ class ModelManager(ABC):
         wandb.watch(model, criterion=loss_fn, log="all", log_freq=100)
         wandb.log({"data_version": DATA_VERSION})
         train_dataloader = DataLoader(data.train, batch_size=hp.batch, shuffle=True)
-        test_dataloader = DataLoader(data.test, batch_size=hp.batch, shuffle=True)
+        validation_dataloader = DataLoader(data.validation, batch_size=hp.batch, shuffle=True)
         print(hp)
         optimizer = torch.optim.Adam(model.parameters(), lr=hp.lr)
         for epoch in range(hp.epochs):
@@ -245,12 +318,12 @@ class ModelManager(ABC):
             self._train_epoch(
                 model, loss_fn, train_dataloader, len(data.train), optimizer
             )
-            self._test(epoch, model, loss_fn, test_dataloader, len(data.test))
+            self._validate(epoch, model, loss_fn, validation_dataloader, len(data.validation))
 
         confusion_sample_indices = (
-            random.sample(data.test.indices, SAMPLES_TO_CHECK)
-            if len(data.test) > SAMPLES_TO_CHECK
-            else data.test.indices
+            random.sample(data.validation.indices, SAMPLES_TO_CHECK)
+            if len(data.validation) > SAMPLES_TO_CHECK
+            else data.validation.indices
         )
         confusion_sample: Dict[str, List[str]] = {}
 
@@ -283,6 +356,9 @@ class ModelManager(ABC):
 
         print("Confusion matrix sample:")
         print(repr(confusion_sample))
+        self._store_the_model(model)
+        if submission and submission == 1:  # we want to prepare test data
+            self._test(model, data.test)
 
         print("Done!")
 
