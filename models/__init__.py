@@ -124,11 +124,11 @@ class ModelManager(ABC):
     ):
         model.train()
         interval_train_loss = 0.0
-        for batch_num, (x, y) in enumerate(dataloader):
+        for batch_num, (xd, y) in enumerate(dataloader):
 
             optimizer.zero_grad()
 
-            pred = model(x)
+            pred = model(xd)
             loss = loss_fn(pred, y)
 
             loss.backward()
@@ -138,7 +138,8 @@ class ModelManager(ABC):
             if batch_num % TRAIN_LOGGING_INTERVAL == 0:
                 interval_batches_done = TRAIN_LOGGING_INTERVAL if batch_num > 0 else 1
                 interval_loss = interval_train_loss / interval_batches_done
-                num_done = (batch_num + 1) * len(x)
+                x_tensor_example = next(iter(xd.values()))
+                num_done = (batch_num + 1) * len(x_tensor_example)
                 print(
                     f"training loss: {interval_loss:>5f}  [{num_done:>6d}/{num_examples:>6d}]"
                 )
@@ -171,8 +172,8 @@ class ModelManager(ABC):
         pred_all, y_all = None, None
 
         with torch.no_grad():
-            for x, y in dataloader:
-                pred = model(x)
+            for xd, y in dataloader:
+                pred = model(xd)
                 loss = loss_fn(pred, y)
                 if pred_all is not None:
                     pred_all = np.append(pred_all, pred.cpu().data.numpy(), axis=0)
