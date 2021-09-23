@@ -1,5 +1,5 @@
 from dataclasses import dataclass, asdict
-from typing import Type
+from typing import Type, Dict
 
 import torch
 import wandb
@@ -67,7 +67,7 @@ class ConvBlock(nn.Module):
         self.bn = nn.BatchNorm2d(out_channels)
         self.activation = nn.ReLU()
 
-    def forward(self, x, use_activation=False):
+    def forward(self, x: Tensor, use_activation=False):
         out = self.conv(x)
         out = self.bn(out)
         if use_activation is True:
@@ -107,7 +107,7 @@ class ResnetBlock(nn.Module):
         self.activation = nn.ReLU()
         self.mp = nn.MaxPool2d((self.hp.mp, self.hp.mp))
 
-    def forward(self, x):
+    def forward(self, x: Tensor):
         out = self.conv_bn1.forward(x, True)
         out = self.conv_bn2.forward(out, True)
         out = self.conv_bn3.forward(out, False)
@@ -138,7 +138,8 @@ class CnnResnet(nn.Module):
             out_features=self.hp.linear1out,
         )
 
-    def forward(self, x: Tensor) -> Tensor:
+    def forward(self, xd: Dict[str, Tensor]) -> Tensor:
+        x = xd[qtransform_meta.name]
         batch_size = x.size()[0]
         assert x.size()[1:] == qtransform_meta.output_shape
         out = self.block1.forward(x)

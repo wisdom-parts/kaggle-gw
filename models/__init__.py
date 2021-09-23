@@ -20,7 +20,7 @@ def to_odd(i: int) -> int:
     return (i // 2) * 2 + 1
 
 
-class GwDataset(Dataset[Tuple[Tensor, Tensor]]):
+class GwDataset(Dataset[Tuple[Dict[str, Tensor], Tensor]]):
     """
     Represents the training examples of a g2net data directory as Tensors.
     """
@@ -33,11 +33,11 @@ class GwDataset(Dataset[Tuple[Tensor, Tensor]]):
         transform: Callable[[np.ndarray], Tensor],
         target_transform: Callable[[int], Tensor],
     ):
-        if len(preprocessors) > 1:
-            raise ValueError("multiple data names not yet supported")
         self.data_dir = data_dir
+        self.preprocessors = preprocessors
         self.transform = transform
         self.target_transform = target_transform
+
         self.ids: List[str] = []
         self.id_to_label: Dict[str, int] = {}
         with open(training_labels_file(data_dir)) as id_label_file:
@@ -48,31 +48,27 @@ class GwDataset(Dataset[Tuple[Tensor, Tensor]]):
                     self.id_to_label[_id] = int(label)
                     if n and len(self.ids) >= n:
                         break
-        preprocessor_name = preprocessors[0].name
-        self.data_name = (
-            preprocessor_name
-            if train_file(data_dir, self.ids[0], preprocessor_name).exists()
-            else None
-        )
 
     def __len__(self):
         return len(self.ids)
 
-    def __getitem__(self, idx: int) -> Tuple[Tensor, Tensor]:
+    def __getitem__(self, idx: int) -> Tuple[Dict[str, Tensor], Tensor]:
         _id = self.ids[idx]
-        fpath = str(train_file(self.data_dir, _id, self.data_name))
 
-        x = self.transform(np.load(fpath))
+        xd: Dict[str, Tensor] = {}
+        for preprocessor in self.preprocessors:
+            fpath = str(train_file(self.data_dir, _id, preprocessor.name))
+            v = self.transform(np.load(fpath))
+            xd[preprocessor.name] = v
         y = self.target_transform(self.id_to_label[_id])
-
-        return x, y
+        return xd, y
 
 
 @dataclass
 class MyDatasets:
     gw: GwDataset
-    train: Subset[Tuple[Tensor, Tensor]]
-    test: Subset[Tuple[Tensor, Tensor]]
+    train: Subset[Tuple[Dict[str, Tensor], Tensor]]
+    test: Subset[Tuple[Dict[str, Tensor], Tensor]]
 
 
 def gw_train_and_test_datasets(
@@ -128,11 +124,11 @@ class ModelManager(ABC):
     ):
         model.train()
         interval_train_loss = 0.0
-        for batch_num, (X, y) in enumerate(dataloader):
+        for batch_num, (x, y) in enumerate(dataloader):
 
             optimizer.zero_grad()
 
-            pred = model(X)
+            pred = model(x)
             loss = loss_fn(pred, y)
 
             loss.backward()
@@ -142,7 +138,7 @@ class ModelManager(ABC):
             if batch_num % TRAIN_LOGGING_INTERVAL == 0:
                 interval_batches_done = TRAIN_LOGGING_INTERVAL if batch_num > 0 else 1
                 interval_loss = interval_train_loss / interval_batches_done
-                num_done = (batch_num + 1) * len(X)
+                num_done = (batch_num + 1) * len(x)
                 print(
                     f"training loss: {interval_loss:>5f}  [{num_done:>6d}/{num_examples:>6d}]"
                 )
@@ -175,8 +171,8 @@ class ModelManager(ABC):
         pred_all, y_all = None, None
 
         with torch.no_grad():
-            for X, y in dataloader:
-                pred = model(X)
+            for x, y in dataloader:
+                pred = model(x)
                 loss = loss_fn(pred, y)
                 if pred_all is not None:
                     pred_all = np.append(pred_all, pred.cpu().data.numpy(), axis=0)
@@ -264,7 +260,7 @@ class ModelManager(ABC):
             _id = data.gw.ids[i]
             x, y = data.gw[i]
             # add batch dimension
-            x = torch.unsqueeze(x, 0)
+            x = {p: torch.unsqueeze(t, 0) for p, t in x.items()}
             y = torch.unsqueeze(y, 0)
             pred = model(x)
 
@@ -336,7 +332,6 @@ class MaxHead(nn.Module):
     # noinspection PyUnusedLocal
     def __init__(
         self,
-        device: torch.device,
         hp: HpWithRegressionHead,
         input_shape: Tuple[int, ...],
     ):
@@ -365,7 +360,6 @@ class LinearHead(nn.Module):
     # noinspection PyUnusedLocal
     def __init__(
         self,
-        device: torch.device,
         hp: HpWithRegressionHead,
         input_shape: Tuple[int, ...],
     ):

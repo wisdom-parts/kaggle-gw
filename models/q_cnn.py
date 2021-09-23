@@ -1,5 +1,5 @@
 from dataclasses import dataclass, asdict
-from typing import Type, Tuple, Union
+from typing import Type, Tuple, Union, Dict
 
 import torch
 import wandb
@@ -113,7 +113,7 @@ class ConvBlock(nn.Module):
         self.bn = nn.BatchNorm2d(out_channels)
         self.activation = nn.ReLU()
 
-    def forward(self, x, use_activation=False):
+    def forward(self, x: Tensor, use_activation=False):
         out = self.conv(x)
         out = self.bn(out)
         if use_activation is True:
@@ -136,9 +136,8 @@ class Cnn(nn.Module):
     hyper-parameters.
     """
 
-    def __init__(self, device: torch.device, hp: QCnnHp, apply_final_activation: bool):
+    def __init__(self, hp: QCnnHp, apply_final_activation: bool):
         super().__init__()
-        self.device = device
         self.hp = hp
         self.apply_final_activation = apply_final_activation
 
@@ -219,13 +218,14 @@ class Cnn(nn.Module):
 
 
 class Model(nn.Module):
-    def __init__(self, cnn: nn.Module, head: nn.Module):
+    def __init__(self, cnn: nn.Module, head: nn.Module, hp: QCnnHp):
         super().__init__()
         self.cnn = cnn
         self.head = head
+        self.hp = hp
 
-    def forward(self, x: Tensor) -> Tensor:
-        return self.head(self.cnn(x))
+    def forward(self, xd: Dict[str, Tensor]) -> Tensor:
+        return self.head(self.cnn(xd[self.hp.preprocessor.value.name]))
 
 
 class Manager(ModelManager):
@@ -244,8 +244,8 @@ class Manager(ModelManager):
         head_class: Union[Type[MaxHead], Type[LinearHead]] = (
             MaxHead if hp.head == RegressionHead.MAX else LinearHead
         )
-        cnn = Cnn(device, hp, head_class.apply_activation_before_input)
-        head = head_class(device, hp, cnn.output_shape)
-        model = Model(cnn, head)
+        cnn = Cnn(hp, head_class.apply_activation_before_input)
+        head = head_class(hp, cnn.output_shape)
+        model = Model(cnn, head, hp)
 
         self._train(model, device, data_dir, n, [hp.preprocessor.value], hp)

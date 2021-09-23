@@ -1,5 +1,5 @@
 from dataclasses import dataclass, asdict
-from typing import Type, Union
+from typing import Type, Union, Dict
 
 import torch
 import wandb
@@ -97,11 +97,8 @@ class Cnn(nn.Module):
     hyper-parameters.
     """
 
-    def __init__(
-        self, device: torch.device, hp: SigCnnHp, apply_final_activation: bool
-    ):
+    def __init__(self, hp: SigCnnHp, apply_final_activation: bool):
         super().__init__()
-        self.device = device
         self.hp = hp
         self.apply_final_activation = apply_final_activation
 
@@ -163,8 +160,8 @@ class Model(nn.Module):
         self.cnn = cnn
         self.head = head
 
-    def forward(self, x: Tensor) -> Tensor:
-        return self.head(self.cnn(x))
+    def forward(self, xd: Dict[str, Tensor]) -> Tensor:
+        return self.head(self.cnn(xd[filter_sig_meta.name]))
 
 
 class Manager(ModelManager):
@@ -183,8 +180,8 @@ class Manager(ModelManager):
         head_class: Union[Type[MaxHead], Type[LinearHead]] = (
             MaxHead if hp.head == RegressionHead.MAX else LinearHead
         )
-        cnn = Cnn(device, hp, head_class.apply_activation_before_input)
-        head = head_class(device, hp, cnn.output_shape)
+        cnn = Cnn(hp, head_class.apply_activation_before_input)
+        head = head_class(hp, cnn.output_shape)
         model = Model(cnn, head)
 
         self._train(model, device, data_dir, n, [filter_sig_meta], hp)
