@@ -195,14 +195,16 @@ class ModelManager(ABC):
             self,
             model: nn.Module,
             test: GwSubmissionDataset,
+            batch: int,
     ):
         num_test_examples = len(test.ids)
         fields = ['id', 'target']
+        test_dataloader = DataLoader(test, batch_size=batch)
         with open("submissions.csv", "w") as csvfile:
             csvwriter = csv.writer(csvfile)
             csvwriter.writerow(fields)
-            for i in range(num_test_examples):
-                _id = test.ids[i]
+            for X in test_dataloader:
+                _id = X.ids[i]
                 x = test[i]
                 # add batch dimension
                 x = torch.unsqueeze(x, 0)
@@ -213,14 +215,14 @@ class ModelManager(ABC):
                 csvwriter.writerow([_id, pred_val])
         print("Finished writing to submissions.csv!")
 
-    def _store_the_model(self, model: nn.Module):
+    def _store_the_model(self, model: nn.Module, optimizer: nn.Module):
         """
             Save the model as a state dict.
         """
         cur_time = datetime.datetime.now()
         timestamp = cur_time.strftime("%Y%d%m_%H:%M:%S")
         filename = f"model_{timestamp}.pt"
-        torch.save(model.state_dict(), filename)
+        torch.save({"model_state_dict": model.state_dict(), "optimizer_state_dict": optimizer.state_dict()}, filename)
         print (f"Latest model has been stored as {filename}")
 
     # noinspection PyCallingNonCallable
@@ -384,9 +386,9 @@ class ModelManager(ABC):
 
         print("Confusion matrix sample:")
         print(repr(confusion_sample))
-        self._store_the_model(model)
+        self._store_the_model(model, optimizer)
         if submission == 1:  # we want to prepare test data
-            self._test(model, data.test)
+            self._test(model, data.test, hp.batch)
 
         print("Done!")
 
