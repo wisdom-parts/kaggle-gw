@@ -211,8 +211,7 @@ class ModelManager(ABC):
                 pred = model(x)
                 m = torch.nn.Sigmoid()
                 op = m(pred).data.cpu().numpy()[0]
-                pred_val = 0 if op <= 0.5 else 1
-                csvwriter.writerow([_id, pred_val])
+                csvwriter.writerow([_id, op])
         print("Finished writing to submissions.csv!")
 
     def _store_the_model(self, model: nn.Module, optimizer: nn.Module):
