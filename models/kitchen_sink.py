@@ -14,7 +14,7 @@ from preprocessor_meta import qtransform_meta, filter_sig_meta
 @argsclass(name="kitchen_sink")
 @dataclass
 class KitchenSinkHp(HyperParameters):
-    batch: int = 512
+    batch: int = 250
     epochs: int = 1
     lr: float = 0.001
     dtype: torch.dtype = torch.float32
