@@ -52,12 +52,12 @@ class GwSubmissionDataset(Dataset[Tuple[Tensor]]):
     def __len__(self):
         return len(self.ids)
 
-    def __getitem__(self, idx: int) -> Tensor:
+    def __getitem__(self, idx: int) -> Tuple[Tensor, str]:
         _id = self.ids[idx]
         fpath = str(test_file(self.data_dir, _id, self.data_name))
 
         x = self.transform(np.load(fpath))
-        return x
+        return x, _id
 
 class GwDataset(Dataset[Tuple[Tensor, Tensor]]):
     """
@@ -201,37 +201,17 @@ class ModelManager(ABC):
             test: GwSubmissionDataset,
             batch: int,
     ):
-        num_test_examples = len(test.ids)
         fields = ['id', 'target']
         test_dataloader = DataLoader(test, batch_size=batch)
         with open("submissions.csv", "w") as csvfile:
             csvwriter = csv.writer(csvfile)
             csvwriter.writerow(fields)
-            for X in test_dataloader:
-                _id = X.ids[i]
-                x = test[i]
-                # add batch dimension
-                x = torch.unsqueeze(x, 0)
+            for batch_num, (x, _id) in enumerate(test_dataloader):
                 pred = model(x)
                 m = torch.nn.Sigmoid()
                 op = m(pred).data.cpu().numpy()[0]
                 csvwriter.writerow([_id, op])
         print("Finished writing to submissions.csv!")
-
-    def _store_the_model(self, model: nn.Module, optimizer: nn.Module, hp: "HyperParameters"):
-        """
-            Save the model as a state dict.
-        """
-        cur_time = datetime.datetime.now()
-        timestamp = cur_time.strftime("%Y%d%m_%H:%M:%S")
-        filename = f"model_{timestamp}.pt"
-        torch.save({
-            "model_state_dict": model.state_dict(),
-            "optimizer_state_dict": optimizer.state_dict(),
-            "hp": hp.__dict__,
-        }, filename)
-        print (f"Latest model has been stored as {filename}")
-
 
     # noinspection PyCallingNonCallable
     def _validate(
@@ -363,7 +343,6 @@ class ModelManager(ABC):
 
         print("Confusion matrix sample:")
         print(repr(confusion_sample))
-        self._store_the_model(model, optimizer, hp)
         if submission == 1:  # we want to prepare test data
             self._test(model, data.test, hp.batch)
 
