@@ -23,13 +23,23 @@ CORR_MAX_LAG_MILLIS = 10
 CORR_MAX_LAG = ceil(CORR_MAX_LAG_MILLIS * SIGNAL_LEN / (1000 * SIGNAL_SECS))
 CORR_NUM_LAGS = 2 * CORR_MAX_LAG + 1
 
+RAW_PREPROCESSOR_NAME = "raw"
+
 
 @dataclass
 class PreprocessorMeta:
     name: str
     output_shape: Tuple[int, ...]
 
+    @property
+    def data_name(self):
+        if self.name == RAW_PREPROCESSOR_NAME:
+            return None
+        else:
+            return self.name
 
+
+raw_meta = PreprocessorMeta(RAW_PREPROCESSOR_NAME, (N_SIGNALS, SIGNAL_LEN))
 filter_sig_meta = PreprocessorMeta(
     "filter_sig", (N_SIGNALS, SIGNAL_LEN - 2 * FILTER_CROP)
 )
@@ -40,6 +50,7 @@ correlation_meta = PreprocessorMeta("correlation", (CORR_NUM_LAGS, 2, CORR_NUM_W
 
 
 class Preprocessor(Enum):
+    RAW = raw_meta
     FILTER_SIG = filter_sig_meta
     QTRANSFORM = qtransform_meta
     CORRELATION = correlation_meta

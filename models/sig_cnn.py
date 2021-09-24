@@ -15,7 +15,7 @@ from models import (
     HpWithRegressionHead,
     RegressionHead,
 )
-from preprocessor_meta import filter_sig_meta
+from preprocessor_meta import filter_sig_meta, Preprocessor, PreprocessorMeta
 
 
 def to_odd(i: int) -> int:
@@ -33,6 +33,8 @@ class SigCnnHp(HpWithRegressionHead):
     linear1drop: float = 0.0
     linear1out: int = 64  # if this value is 1, then omit linear2
     head: RegressionHead = RegressionHead.LINEAR
+
+    preprocessor: Preprocessor = Preprocessor.FILTER_SIG
 
     conv1w: int = 111
     conv1out: int = 100
@@ -102,9 +104,11 @@ class Cnn(nn.Module):
         self.hp = hp
         self.apply_final_activation = apply_final_activation
 
+        preprocessor_meta: PreprocessorMeta = hp.preprocessor.value
+
         self.conv1 = ConvBlock(
             w=hp.conv1w,
-            in_channels=N_SIGNALS,
+            in_channels=preprocessor_meta.output_shape[0],
             out_channels=hp.conv1out,
             stride=hp.conv1stride,
             mpw=hp.mp1w,
@@ -131,7 +135,7 @@ class Cnn(nn.Module):
             mpw=hp.mp4w,
         )
         outw = (
-            filter_sig_meta.output_shape[1]
+            preprocessor_meta.output_shape[1]
             // hp.conv1stride
             // hp.mp1w
             // hp.conv2stride
@@ -155,13 +159,14 @@ class Cnn(nn.Module):
 
 
 class Model(nn.Module):
-    def __init__(self, cnn: nn.Module, head: nn.Module):
+    def __init__(self, cnn: nn.Module, head: nn.Module, hp: SigCnnHp):
         super().__init__()
         self.cnn = cnn
         self.head = head
+        self.hp = hp
 
     def forward(self, xd: Dict[str, Tensor]) -> Tensor:
-        return self.head(self.cnn(xd[filter_sig_meta.name]))
+        return self.head(self.cnn(xd[self.hp.preprocessor.value.name]))
 
 
 class Manager(ModelManager):
@@ -182,6 +187,6 @@ class Manager(ModelManager):
         )
         cnn = Cnn(hp, head_class.apply_activation_before_input)
         head = head_class(hp, cnn.output_shape)
-        model = Model(cnn, head)
+        model = Model(cnn, head, hp)
 
-        self._train(model, device, data_dir, n, [filter_sig_meta], hp)
+        self._train(model, device, data_dir, n, [hp.preprocessor.value], hp)

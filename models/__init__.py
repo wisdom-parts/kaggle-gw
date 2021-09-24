@@ -57,7 +57,7 @@ class GwDataset(Dataset[Tuple[Dict[str, Tensor], Tensor]]):
 
         xd: Dict[str, Tensor] = {}
         for preprocessor in self.preprocessors:
-            fpath = str(train_file(self.data_dir, _id, preprocessor.name))
+            fpath = str(train_file(self.data_dir, _id, preprocessor.data_name))
             v = self.transform(np.load(fpath))
             xd[preprocessor.name] = v
         y = self.target_transform(self.id_to_label[_id])
