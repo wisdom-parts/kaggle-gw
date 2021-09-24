@@ -13,7 +13,7 @@ dependencies:
   - pandas
   - pre-commit
   - pytest
-  - python
+  - python=3.9.7
   - pytorch #-gpu
   - seaborn
   - torchaudio
