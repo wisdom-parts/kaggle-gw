@@ -7,20 +7,28 @@ from datargs import argsclass
 from torch import nn, Tensor
 
 from gw_data import *
-from models import HyperParameters, ModelManager, q_cnn, sig_cnn
+from models import (
+    HyperParameters,
+    ModelManager,
+    q_cnn,
+    sig_cnn,
+    HpWithRegressionHead,
+    RegressionHead,
+)
 from preprocessor_meta import qtransform_meta, filter_sig_meta
 
 
 @argsclass(name="kitchen_sink")
 @dataclass
-class KitchenSinkHp(HyperParameters):
+class KitchenSinkHp(HpWithRegressionHead):
     batch: int = 250
     epochs: int = 1
     lr: float = 0.001
     dtype: torch.dtype = torch.float32
 
-    linear1drop: float = 0.2
-    linear1out: int = 100
+    linear1drop: float = 0.0
+    linear1out: int = 100  # if this value is 1, then omit linear2
+    head: RegressionHead = RegressionHead.LINEAR
 
     @property
     def manager_class(self) -> Type[ModelManager]:
@@ -36,6 +44,11 @@ class KitchenSinkHp(HyperParameters):
 class Model(nn.Module):
     def __init__(self, hp: KitchenSinkHp):
         super().__init__()
+
+        if hp.head != RegressionHead.LINEAR:
+            raise NotImplementedError(
+                "kitchen_sink only supports RegressionHead.LINEAR"
+            )
 
         self.q_conv = q_cnn.Cnn(hp.q_cnn_hp(), True)
         self.sig_conv = sig_cnn.Cnn(hp.sig_cnn_hp(), True)

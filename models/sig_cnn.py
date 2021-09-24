@@ -27,10 +27,10 @@ def to_odd(i: int) -> int:
 class SigCnnHp(HpWithRegressionHead):
     batch: int = 250
     epochs: int = 1
-    lr: float = 0.01
+    lr: float = 0.001
     dtype: torch.dtype = torch.float32
 
-    linear1drop: float = 0.2
+    linear1drop: float = 0.0
     linear1out: int = 64  # if this value is 1, then omit linear2
     head: RegressionHead = RegressionHead.LINEAR
 

@@ -315,7 +315,7 @@ class RegressionHead(Enum):
 
 
 class HpWithRegressionHead(HyperParameters):
-    linear1drop: float = 0.2
+    linear1drop: float = 0.0
     linear1out: int = 64  # if this value is 1, then omit linear2
     head: RegressionHead = RegressionHead.LINEAR
 
