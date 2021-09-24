@@ -218,14 +218,18 @@ class ModelManager(ABC):
                 csvwriter.writerow([_id, op])
         print("Finished writing to submissions.csv!")
 
-    def _store_the_model(self, model: nn.Module, optimizer: nn.Module):
+    def _store_the_model(self, model: nn.Module, optimizer: nn.Module, hp: "HyperParameters"):
         """
             Save the model as a state dict.
         """
         cur_time = datetime.datetime.now()
         timestamp = cur_time.strftime("%Y%d%m_%H:%M:%S")
         filename = f"model_{timestamp}.pt"
-        torch.save({"model_state_dict": model.state_dict(), "optimizer_state_dict": optimizer.state_dict()}, filename)
+        torch.save({
+            "model_state_dict": model.state_dict(),
+            "optimizer_state_dict": optimizer.state_dict(),
+            "hp": hp.__dict__,
+        }, filename)
         print (f"Latest model has been stored as {filename}")
 
 
@@ -359,7 +363,7 @@ class ModelManager(ABC):
 
         print("Confusion matrix sample:")
         print(repr(confusion_sample))
-        self._store_the_model(model, optimizer)
+        self._store_the_model(model, optimizer, hp)
         if submission == 1:  # we want to prepare test data
             self._test(model, data.test, hp.batch)
 
