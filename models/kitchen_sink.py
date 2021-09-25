@@ -11,7 +11,7 @@ from models import (
     HyperParameters,
     ModelManager,
     q_cnn,
-    sig_cnn,
+    cnn1d,
     HpWithRegressionHead,
     RegressionHead,
 )
@@ -38,7 +38,7 @@ class KitchenSinkHp(HpWithRegressionHead):
         return q_cnn.QCnnHp()
 
     def sig_cnn_hp(self):
-        return sig_cnn.SigCnnHp()
+        return cnn1d.Cnn1dHp()
 
 
 class Model(nn.Module):
@@ -51,7 +51,7 @@ class Model(nn.Module):
             )
 
         self.q_conv = q_cnn.Cnn(hp.q_cnn_hp(), True)
-        self.sig_conv = sig_cnn.Cnn(hp.sig_cnn_hp(), True)
+        self.sig_conv = cnn1d.Cnn1d(hp.sig_cnn_hp(), True)
         self.linear1 = nn.Linear(
             int(np.prod(self.q_conv.output_shape))
             + int(np.prod(self.sig_conv.output_shape)),

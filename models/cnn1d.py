@@ -14,17 +14,14 @@ from models import (
     LinearHead,
     HpWithRegressionHead,
     RegressionHead,
+    to_odd,
 )
-from preprocessor_meta import filter_sig_meta, Preprocessor, PreprocessorMeta
+from preprocessor_meta import Preprocessor, PreprocessorMeta
 
 
-def to_odd(i: int) -> int:
-    return (i // 2) * 2 + 1
-
-
-@argsclass(name="sig_cnn")
+@argsclass(name="cnn1d")
 @dataclass
-class SigCnnHp(HpWithRegressionHead):
+class Cnn1dHp(HpWithRegressionHead):
     batch: int = 250
     epochs: int = 1
     lr: float = 0.001
@@ -92,23 +89,34 @@ class ConvBlock(nn.Module):
         return out
 
 
-class Cnn(nn.Module):
+class Cnn1d(nn.Module):
     """
-    Applies a CNN to qtransform data and produces an output shaped like
-    (batch, channels, width). Dimension sizes depend on
-    hyper-parameters.
+    Takes an input of at least two dimensions, with the last treated as in_width and the rest
+    treated as channels. Applies a 1D cnn to product an output shaped (out_channels, out_width),
+    where the sizes depend on hyper-parameters. (Additionally, there's a batch dimension at the
+    front of every shape.)
     """
 
-    def __init__(self, hp: SigCnnHp, apply_final_activation: bool):
+    def __init__(self, hp: Cnn1dHp, apply_final_activation: bool):
         super().__init__()
         self.hp = hp
         self.apply_final_activation = apply_final_activation
 
         preprocessor_meta: PreprocessorMeta = hp.preprocessor.value
+        in_shape = preprocessor_meta.output_shape
+        if len(in_shape) < 2:
+            raise ValueError(
+                f"Cnn1d requires at least 2 dimensions; got {len(in_shape)}"
+            )
+        in_channels = int(np.prod(in_shape[0:-1]))
+        in_w = in_shape[-1]
+
+        # includes batch dimension
+        self.last_in_channel_dim = len(in_shape) - 1
 
         self.conv1 = ConvBlock(
             w=hp.conv1w,
-            in_channels=preprocessor_meta.output_shape[0],
+            in_channels=in_channels,
             out_channels=hp.conv1out,
             stride=hp.conv1stride,
             mpw=hp.mp1w,
@@ -134,8 +142,8 @@ class Cnn(nn.Module):
             stride=hp.conv4stride,
             mpw=hp.mp4w,
         )
-        outw = (
-            preprocessor_meta.output_shape[1]
+        out_w = (
+            in_w
             // hp.conv1stride
             // hp.mp1w
             // hp.conv2stride
@@ -145,13 +153,17 @@ class Cnn(nn.Module):
             // hp.conv4stride
             // hp.mp4w
         )
-        wandb.log({"conv_out_width": outw})
-        if outw == 0:
+        wandb.log({"conv_out_width": out_w})
+        if out_w == 0:
             raise ValueError("strides and maxpools took output width to zero")
-        self.output_shape = (hp.conv4out, outw)
+        self.output_shape = (hp.conv4out, out_w)
 
     def forward(self, x: Tensor) -> Tensor:
-        out = self.conv1(x, use_activation=True)
+
+        # Flatten to a single channel dimension.
+        out = torch.flatten(x, 1, self.last_in_channel_dim)
+
+        out = self.conv1(out, use_activation=True)
         out = self.conv2(out, use_activation=True)
         out = self.conv3(out, use_activation=True)
         out = self.conv4(out, use_activation=self.apply_final_activation)
@@ -159,7 +171,7 @@ class Cnn(nn.Module):
 
 
 class Model(nn.Module):
-    def __init__(self, cnn: nn.Module, head: nn.Module, hp: SigCnnHp):
+    def __init__(self, cnn: nn.Module, head: nn.Module, hp: Cnn1dHp):
         super().__init__()
         self.cnn = cnn
         self.head = head
@@ -177,7 +189,7 @@ class Manager(ModelManager):
         device: torch.device,
         hp: HyperParameters,
     ):
-        if not isinstance(hp, SigCnnHp):
+        if not isinstance(hp, Cnn1dHp):
             raise ValueError("wrong hyper-parameter class: {hp}")
 
         wandb.init(project="g2net-" + __name__, entity="wisdom", config=asdict(hp))
@@ -185,7 +197,7 @@ class Manager(ModelManager):
         head_class: Union[Type[MaxHead], Type[LinearHead]] = (
             MaxHead if hp.head == RegressionHead.MAX else LinearHead
         )
-        cnn = Cnn(hp, head_class.apply_activation_before_input)
+        cnn = Cnn1d(hp, head_class.apply_activation_before_input)
         head = head_class(hp, cnn.output_shape)
         model = Model(cnn, head, hp)
 
