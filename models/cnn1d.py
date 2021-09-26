@@ -2,7 +2,7 @@ import math
 from abc import ABC
 from dataclasses import dataclass, asdict
 from enum import Enum, auto
-from typing import Type, Union, Dict, Tuple
+from typing import Type, Union, Dict, Tuple, cast
 
 import numpy as np
 import torch
@@ -61,9 +61,12 @@ class CqtInputLayer(nn.Module):
         self.bn = nn.BatchNorm2d(N_SIGNALS)
 
     def forward(self, x: Tensor) -> Tensor:
-        out = self.cqt(x)
-        # CQT2010v2 returns a value for each time endpoint. We'd prefer exactly out_w.
+        # CQT2010v2 doesn't support separate batch and channel dimensions, so combine them.
+        out = self.cqt(torch.flatten(x, start_dim=0, end_dim=1))
+        # CQT2010v2 returns a value for each time endpoint. We'd prefer exactly out_w values.
         out = out[:, :, 0:-1]
+        # Separate the batch and channel dimensions again.
+        out = out.view(x.shape[0], *self.output_shape)
         out = self.bn(out)
         return out
 
@@ -165,20 +168,22 @@ class Cnn1d(nn.Module):
             input_layer_class = CqtInputLayer
             self.input_layer = input_layer_class(in_shape)
             conv_in_shape = self.input_layer.output_shape
+        else:
+            conv_in_shape = cast(Tuple[int, int, int], in_shape)
 
         if len(in_shape) < 2:
             raise ValueError(
                 f"Cnn1d requires at least 2 dimensions; got {len(in_shape)}"
             )
-        in_channels = int(np.prod(in_shape[0:-1]))
-        in_w = in_shape[-1]
+        conv_in_channels = int(np.prod(conv_in_shape[0:-1]))
+        conv_in_w = conv_in_shape[-1]
 
         # includes batch dimension
-        self.last_in_channel_dim = len(in_shape) - 1
+        self.last_in_channel_dim = len(conv_in_shape) - 1
 
         self.conv1 = ConvBlock(
             w=hp.conv1w,
-            in_channels=in_channels,
+            in_channels=conv_in_channels,
             out_channels=hp.conv1out,
             stride=hp.conv1stride,
             mpw=hp.mp1w,
@@ -205,7 +210,7 @@ class Cnn1d(nn.Module):
             mpw=hp.mp4w,
         )
         out_w = (
-            in_w
+            conv_in_w
             // hp.conv1stride
             // hp.mp1w
             // hp.conv2stride
@@ -221,9 +226,10 @@ class Cnn1d(nn.Module):
         self.output_shape = (hp.conv4out, out_w)
 
     def forward(self, x: Tensor) -> Tensor:
+        out = self.input_layer(x) if self.input_layer else x
 
         # Flatten to a single channel dimension.
-        out = torch.flatten(x, 1, self.last_in_channel_dim)
+        out = torch.flatten(out, 1, self.last_in_channel_dim)
 
         out = self.conv1(out, use_activation=True)
         out = self.conv2(out, use_activation=True)
