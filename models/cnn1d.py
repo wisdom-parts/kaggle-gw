@@ -1,9 +1,14 @@
+import math
+from abc import ABC
 from dataclasses import dataclass, asdict
-from typing import Type, Union, Dict
+from enum import Enum, auto
+from typing import Type, Union, Dict, Tuple
 
+import numpy as np
 import torch
 import wandb
 from datargs import argsclass
+from nnAudio.Spectrogram import CQT2010v2
 from torch import nn, Tensor
 
 from gw_data import *
@@ -19,6 +24,54 @@ from models import (
 from preprocessor_meta import Preprocessor, PreprocessorMeta
 
 
+class CqtInputLayer(nn.Module):
+    out_w = 256
+    hop_len = 4096 // out_w
+    sampling_rate = SIGNAL_LEN / SIGNAL_SECS
+
+    # CQT2010v2 doesn't respect fmax. It ends up adjusting the frequency end-points and then
+    # failing because its new fmax exceeds the Nyquist frequency. So we have to compute the
+    # octaves and bins ourselves.
+    fmin = 32.0
+    fmax = 512.0
+    bins_per_octave = 12
+    n_octaves = round(math.log(fmax / fmin, 2))
+    n_bins = n_octaves * bins_per_octave
+
+    def __init__(self, in_shape: Tuple[int, ...]):
+        super().__init__()
+        if in_shape != (N_SIGNALS, SIGNAL_LEN):
+            raise ValueError(
+                f"this layer only supports raw signals; got shape {in_shape}"
+            )
+        self.cqt = CQT2010v2(
+            sr=self.sampling_rate,
+            hop_length=self.hop_len,
+            fmin=self.fmin,
+            n_bins=self.n_bins,
+            bins_per_octave=self.bins_per_octave,
+            norm=False,
+            output_format="Magnitude",  # TODO: "Complex"
+        )
+        self.freqs = self.cqt.frequencies
+        self.times = np.array(
+            [(i / self.out_w) * SIGNAL_SECS for i in range(self.out_w)]
+        )
+        self.output_shape = (N_SIGNALS, len(self.freqs), self.out_w)
+        self.bn = nn.BatchNorm2d(N_SIGNALS)
+
+    def forward(self, x: Tensor) -> Tensor:
+        out = self.cqt(x)
+        # CQT2010v2 returns a value for each time endpoint. We'd prefer exactly out_w.
+        out = out[:, :, 0:-1]
+        out = self.bn(out)
+        return out
+
+
+class InputLayer(Enum):
+    CQT = auto()
+
+
 @argsclass(name="cnn1d")
 @dataclass
 class Cnn1dHp(HpWithRegressionHead):
@@ -32,6 +85,8 @@ class Cnn1dHp(HpWithRegressionHead):
     head: RegressionHead = RegressionHead.LINEAR
 
     preprocessor: Preprocessor = Preprocessor.FILTER_SIG
+
+    inputlayer: Optional[InputLayer] = None
 
     conv1w: int = 111
     conv1out: int = 100
@@ -104,6 +159,13 @@ class Cnn1d(nn.Module):
 
         preprocessor_meta: PreprocessorMeta = hp.preprocessor.value
         in_shape = preprocessor_meta.output_shape
+
+        self.input_layer = None
+        if hp.inputlayer:
+            input_layer_class = CqtInputLayer
+            self.input_layer = input_layer_class(in_shape)
+            conv_in_shape = self.input_layer.output_shape
+
         if len(in_shape) < 2:
             raise ValueError(
                 f"Cnn1d requires at least 2 dimensions; got {len(in_shape)}"

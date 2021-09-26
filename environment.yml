@@ -29,4 +29,5 @@ dependencies:
       - wandb
       - efficientnet_pytorch
       - scikit-learn
+      - nnAudio
       #- scikit-cuda
