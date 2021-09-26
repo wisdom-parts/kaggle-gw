@@ -78,38 +78,38 @@ class InputLayer(Enum):
 @argsclass(name="cnn1d")
 @dataclass
 class Cnn1dHp(HpWithRegressionHead):
-    batch: int = 250
+    batch: int = 600
     epochs: int = 1
-    lr: float = 0.001
+    lr: float = 0.01
     dtype: torch.dtype = torch.float32
 
     linear1drop: float = 0.0
     linear1out: int = 64  # if this value is 1, then omit linear2
     head: RegressionHead = RegressionHead.LINEAR
 
-    preprocessor: Preprocessor = Preprocessor.FILTER_SIG
+    preprocessor: Preprocessor = Preprocessor.QTRANSFORM
 
     inputlayer: Optional[InputLayer] = None
 
-    conv1w: int = 111
-    conv1out: int = 100
+    conv1w: int = 5
+    conv1out: int = 200
     conv1stride: int = 1
     mp1w: int = 2
 
-    conv2w: int = 7
-    conv2out: int = 50
+    conv2w: int = 17
+    conv2out: int = 130
     conv2stride: int = 2
-    mp2w: int = 3
+    mp2w: int = 2
 
-    conv3w: int = 15
-    conv3out: int = 70
+    conv3w: int = 17
+    conv3out: int = 65
     conv3stride: int = 2
-    mp3w: int = 4
+    mp3w: int = 1
 
-    conv4w: int = 43
-    conv4out: int = 70
+    conv4w: int = 7
+    conv4out: int = 180
     conv4stride: int = 2
-    mp4w: int = 2
+    mp4w: int = 1
 
     @property
     def manager_class(self) -> Type[ModelManager]:
