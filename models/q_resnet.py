@@ -160,10 +160,18 @@ class Manager(ModelManager):
         n: Optional[int],
         device: torch.device,
         hp: HyperParameters,
-        submission: Optional[int]
+        submission: Optional[int],
     ):
         if not isinstance(hp, QResnetHp):
             raise ValueError("wrong hyper-parameter class: {hp}")
 
         wandb.init(project="g2net-" + __name__, entity="wisdom", config=asdict(hp))
-        self._train(CnnResnet(device, hp), device, data_dir, n, [qtransform_meta], hp, submission)
+        self._train(
+            CnnResnet(device, hp),
+            device,
+            data_dir,
+            n,
+            [qtransform_meta],
+            hp,
+            submission,
+        )

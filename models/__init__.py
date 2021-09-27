@@ -14,49 +14,55 @@ from torch import Tensor, nn
 from torch.utils.data import Dataset, random_split, DataLoader, Subset
 from sklearn.metrics import roc_auc_score
 
-from gw_data import training_labels_file, train_file, validate_source_dir, sample_submission_file, test_file
+from gw_data import (
+    training_labels_file,
+    train_file,
+    validate_source_dir,
+    sample_submission_file,
+    test_file,
+)
 from preprocessor_meta import PreprocessorMeta
 
 
 def to_odd(i: int) -> int:
     return (i // 2) * 2 + 1
 
-class GwSubmissionDataset(Dataset[Tuple[Tensor]]):
+
+class GwSubmissionDataset(Dataset[Dict[str, Tensor]]):
     """
     Represents the test data of the g2net data directory as Tensors.
     """
+
     def __init__(
         self,
         data_dir: Path,
         preprocessors: List[PreprocessorMeta],
         transform: Callable[[np.ndarray], Tensor],
     ):
-        if len(preprocessors) > 1:
-            raise ValueError("multiple data names not yet supported")
         self.data_dir = data_dir
+        self.preprocessors = preprocessors
         self.transform = transform
+
         self.ids: List[str] = []
-        preprocessor_name = preprocessors[0].name
         with open(sample_submission_file(data_dir)) as test_id_label_file:
             for id_label in test_id_label_file:
                 _id, _ = id_label.split(",")
                 if _id != "id":
                     self.ids.append(_id)
-        self.data_name = (
-            preprocessor_name
-            if test_file(data_dir, self.ids[0], preprocessor_name).exists()
-            else None
-        )
 
     def __len__(self):
         return len(self.ids)
 
-    def __getitem__(self, idx: int) -> Tuple[Tensor, str]:
+    def __getitem__(self, idx: int) -> Dict[str, Tensor]:
         _id = self.ids[idx]
-        fpath = str(test_file(self.data_dir, _id, self.data_name))
 
-        x = self.transform(np.load(fpath))
-        return x, _id
+        xd: Dict[str, Tensor] = {}
+        for preprocessor in self.preprocessors:
+            fpath = str(test_file(self.data_dir, _id, preprocessor.data_name))
+            v = self.transform(np.load(fpath))
+            xd[preprocessor.name] = v
+        return xd
+
 
 class GwDataset(Dataset[Tuple[Dict[str, Tensor], Tensor]]):
     """
@@ -101,6 +107,7 @@ class GwDataset(Dataset[Tuple[Dict[str, Tensor], Tensor]]):
         y = self.target_transform(self.id_to_label[_id])
         return xd, y
 
+
 @dataclass
 class MyDatasets:
     gw: GwDataset
@@ -129,7 +136,7 @@ def gw_train_and_test_datasets(
         transform=transform,
         target_transform=target_transform,
     )
-    gw_test = GwSubmissionDataset(data_dir, preprocessors, transform=transform)
+    test = GwSubmissionDataset(data_dir, preprocessors, transform=transform)
     num_examples = len(gw)
     num_train_examples = int(num_examples * 0.8)
     num_validation_examples = num_examples - num_train_examples
@@ -150,7 +157,7 @@ class ModelManager(ABC):
         n: Optional[int],
         device: torch.device,
         hp: "HyperParameters",
-        submission: Optional[int],
+        submission: bool,
     ):
         pass
 
@@ -192,36 +199,41 @@ class ModelManager(ABC):
                 interval_train_loss = 0.0
 
     def _test(
-            self,
-            model: nn.Module,
-            test: GwSubmissionDataset,
-            batch: int,
+        self,
+        model: nn.Module,
+        test: GwSubmissionDataset,
+        batch: int,
     ):
-        fields = ['id', 'target']
+        fields = ["id", "target"]
         test_dataloader = DataLoader(test, batch_size=batch, shuffle=False)
         with open("submissions.csv", "w") as csvfile:
             csvwriter = csv.writer(csvfile)
             csvwriter.writerow(fields)
-            for batch_num, (x, _id) in enumerate(test_dataloader):
-                preds = model(x)
+            for batch_num, (xd, _id) in enumerate(test_dataloader):
+                preds = model(xd)
                 op = preds.data.cpu().numpy()
                 for i in range(batch):
                     csvwriter.writerow([_id[i], op[i]])
         print("Finished writing to submissions.csv!")
 
-    def _store_the_model(self, model: nn.Module, optimizer: nn.Module, hp: "HyperParameters"):
+    def _store_the_model(
+        self, model: nn.Module, optimizer: nn.Module, hp: "HyperParameters"
+    ):
         """
-            Save the model as a state dict.
+        Save the model as a state dict.
         """
         cur_time = datetime.datetime.now()
         timestamp = cur_time.strftime("%Y%d%m_%H:%M:%S")
         filename = f"model_{timestamp}.pt"
-        torch.save({
-            "model_state_dict": model.state_dict(),
-            "optimizer_state_dict": optimizer.state_dict(),
-            "hp": hp.__dict__,
-        }, filename)
-        print (f"Latest model has been stored as {filename}")
+        torch.save(
+            {
+                "model_state_dict": model.state_dict(),
+                "optimizer_state_dict": optimizer.state_dict(),
+                "hp": hp.__dict__,
+            },
+            filename,
+        )
+        print(f"Latest model has been stored as {filename}")
 
     # noinspection PyCallingNonCallable
     def _validate(
@@ -291,38 +303,6 @@ class ModelManager(ABC):
             }
         )
 
-    def _test(
-        self,
-        model: nn.Module,
-        gw_test: GwSubmissionDataset,
-    ):
-        num_test_examples = len(gw_test.ids)
-        fields = ['id', 'target']
-        with open("submissions.csv", "w") as csvfile:
-            csvwriter = csv.writer(csvfile)
-            csvwriter.writerow(fields)
-            for i in range(num_test_examples):
-                _id = gw_test.ids[i]
-                x = gw_test[i]
-                # add batch dimension
-                x = torch.unsqueeze(x, 0)
-                pred = model(x)
-                m = torch.nn.Sigmoid()
-                op = m(pred).data.cpu().numpy()[0]
-                pred_val = 0 if op <= 0.5 else 1
-                csvwriter.writerow([_id, pred_val])
-        print ("Finished writing to submissions.csv!")
-
-    def _store_the_model(self, model: nn.Module):
-        """
-            Dump the model as a pickle file into the local disk.
-        """
-        cur_time = datetime.datetime.now()
-        timestamp = cur_time.strftime("%Y%d%m_%H:%M:%S")
-        filename = f"model_{timestamp}.pt"
-        torch.save(model.state_dict(), filename)
-        print (f"Latest model has been stored as {filename}")
-
     def _train(
         self,
         model: nn.Module,
@@ -338,7 +318,9 @@ class ModelManager(ABC):
         loss_fn = nn.BCEWithLogitsLoss()
         wandb.watch(model, criterion=loss_fn, log="all", log_freq=100)
         train_dataloader = DataLoader(data.train, batch_size=hp.batch, shuffle=True)
-        validation_dataloader = DataLoader(data.validation, batch_size=hp.batch, shuffle=True)
+        validation_dataloader = DataLoader(
+            data.validation, batch_size=hp.batch, shuffle=True
+        )
         print(hp)
         optimizer = torch.optim.Adam(model.parameters(), lr=hp.lr)
         for epoch in range(hp.epochs):
@@ -346,7 +328,9 @@ class ModelManager(ABC):
             self._train_epoch(
                 model, loss_fn, train_dataloader, len(data.train), optimizer
             )
-            self._validate(epoch, model, loss_fn, validation_dataloader, len(data.validation))
+            self._validate(
+                epoch, model, loss_fn, validation_dataloader, len(data.validation)
+            )
 
         confusion_sample_indices = (
             random.sample(data.validation.indices, SAMPLES_TO_CHECK)
@@ -384,7 +368,9 @@ class ModelManager(ABC):
 
         print("Confusion matrix sample:")
         print(repr(confusion_sample))
-        if submission == 1:  # we want to prepare test data
+
+        print("Preparing submission.")
+        if submission:  # we want to prepare test data
             self._test(model, data.test, hp.batch)
 
         print("Done!")
@@ -403,7 +389,11 @@ class HyperParameters:
 
 
 def train_model(
-    manager: ModelManager, data_dir: Path, n: Optional[int], hp: HyperParameters, submission: Optional[int]
+    manager: ModelManager,
+    data_dir: Path,
+    n: Optional[int],
+    hp: HyperParameters,
+    submission: bool,
 ):
     validate_source_dir(data_dir)
 

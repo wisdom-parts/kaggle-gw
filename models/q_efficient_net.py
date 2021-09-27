@@ -62,5 +62,11 @@ class Manager(ModelManager):
 
         wandb.init(project="g2net-" + __name__, entity="wisdom", config=asdict(hp))
         self._train(
-            EfficientNet(device, hp), device, data_dir, n, [qtransform_meta], hp, submission
+            EfficientNet(device, hp),
+            device,
+            data_dir,
+            n,
+            [qtransform_meta],
+            hp,
+            submission,
         )

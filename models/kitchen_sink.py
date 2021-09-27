@@ -87,6 +87,7 @@ class Manager(ModelManager):
         n: Optional[int],
         device: torch.device,
         hp: HyperParameters,
+        submission: bool,
     ):
         if not isinstance(hp, KitchenSinkHp):
             raise ValueError("wrong hyper-parameter class: {hp}")
@@ -95,4 +96,12 @@ class Manager(ModelManager):
 
         model = Model(hp)
 
-        self._train(model, device, data_dir, n, [qtransform_meta, filter_sig_meta], hp)
+        self._train(
+            model,
+            device,
+            data_dir,
+            n,
+            [qtransform_meta, filter_sig_meta],
+            hp,
+            submission,
+        )

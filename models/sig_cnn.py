@@ -183,4 +183,6 @@ class Manager(ModelManager):
             raise ValueError("wrong hyper-parameter class: {hp}")
 
         wandb.init(project="g2net-" + __name__, entity="wisdom", config=asdict(hp))
-        self._train(SigCnn(device, hp), device, data_dir, n, [filter_sig_meta], hp, submission)
+        self._train(
+            SigCnn(device, hp), device, data_dir, n, [filter_sig_meta], hp, submission
+        )
