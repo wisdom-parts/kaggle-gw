@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from enum import Enum
 from math import ceil
-from typing import Tuple
+from typing import Tuple, Dict
 from gw_data import SIGNAL_SECS, N_SIGNALS, SIGNAL_LEN, SIGNAL_TIMES, SIGNAL_DELTA_T
 
 # We separate these constants from the preprocessing module because it goes badly for
@@ -57,3 +57,16 @@ class Preprocessor(Enum):
     FILTER_SIG = filter_sig_meta
     QTRANSFORM = qtransform_meta
     CORRELATION = correlation_meta
+
+
+_meta_by_processor_name: Dict[str, PreprocessorMeta] = dict(
+    [(e.value.name, e.value) for e in Preprocessor]
+)
+
+
+def meta_for_processor_name(name: str) -> PreprocessorMeta:
+    meta = _meta_by_processor_name.get(name)
+    if meta:
+        return meta
+    else:
+        raise ValueError(f'unknown preprocessor name "{name}"')

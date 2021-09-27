@@ -11,6 +11,7 @@ from typing import Callable, Mapping, Set, Tuple, cast
 from command_line import path_to_dir
 from gw_data import *
 from gw_data import make_data_dirs
+from preprocessor_meta import filter_sig_meta, meta_for_processor_name
 from preprocessors import filter_sig, qtransform, correlation
 
 ProcessFunction = Callable[[np.ndarray], np.ndarray]
@@ -33,7 +34,16 @@ class DataSubset(ABC):
 
     @abstractmethod
     def ids_to_process(self, source_ids: List[str]) -> Set[str]:
+        """
+        ids to process in this run
+        """
         pass
+
+    def all_ids_to_process(self, source_ids: List[str]) -> Set[str]:
+        """
+        ids processed by this run and (if partitioned) any peer runs
+        """
+        return self.ids_to_process(source_ids)
 
     def before_creating_dest(self):
         pass
@@ -55,7 +65,7 @@ class DataN(DataSubset):
     def ids_to_process(self, source_ids: List[str]) -> Set[str]:
         if self.n > len(source_ids):
             raise ValueError(
-                f"There are fewer than {self.n} training examples in the source directory."
+                f"There are fewer than {self.n} examples in the source directory."
             )
         return set(source_ids[0 : self.n])
 
@@ -91,6 +101,16 @@ class DataPartition(DataSubset):
             else total_data_size
         )
         return set(source_ids[start:end])
+
+    def all_ids_to_process(self, source_ids: List[str]) -> Set[str]:
+        if self.n is None:
+            return set(source_ids)
+        else:
+            if self.n > len(source_ids):
+                raise ValueError(
+                    f"There are fewer than {self.n} examples in the source directory."
+                )
+            return set(source_ids[0 : self.n])
 
     def before_creating_dest(self):
         if self.partition != 1:
@@ -165,17 +185,12 @@ def preprocess(
 
     data_subset.before_preprocessing()
     source_train_id_list = read_first_column(training_labels_file(source))
-    source_train_id_set = set(source_train_id_list)
-    train_ids_to_process = data_subset.ids_to_process(source_train_id_list)
+    all_train_ids_to_process = data_subset.all_ids_to_process(source_train_id_list)
 
     if dest.exists():
         if not data_subset.covers_all_training_data or not samefile(source, dest):
             dest_ids = set(read_first_column(training_labels_file(dest)))
-            if dest_ids != (
-                source_train_id_set
-                if data_subset.covers_all_training_data
-                else train_ids_to_process
-            ):
+            if dest_ids != all_train_ids_to_process:
                 print(
                     f"{dest} has different training examples than the set we will process.",
                     file=sys.stderr,
@@ -191,7 +206,7 @@ def preprocess(
                 with open(training_labels_file(dest), "w") as training_labels_out:
                     for line in training_labels_in:
                         example_id = line.split(",")[0]
-                        if example_id == "id" or example_id in train_ids_to_process:
+                        if example_id == "id" or example_id in all_train_ids_to_process:
                             training_labels_out.write(line)
 
     mean, stdev = sample_mean_and_stdev(
@@ -204,7 +219,7 @@ def preprocess(
         source_data_name=source_data_name,
         dest=train_dir(dest),
         dest_data_name=dest_data_name,
-        ids_to_process=train_ids_to_process,
+        ids_to_process=data_subset.ids_to_process(source_train_id_list),
         mean=mean,
         stdev=stdev,
     )
@@ -215,14 +230,13 @@ def preprocess(
             shutil.copy(sample_submission_file(source), dest_sample_submission)
 
         source_test_id_list = read_first_column(sample_submission_file(source))
-        test_ids_to_process = data_subset.ids_to_process(source_test_id_list)
         preprocess_train_or_test(
             process_fn,
             source=test_dir(source),
             source_data_name=source_data_name,
             dest=test_dir(dest),
             dest_data_name=dest_data_name,
-            ids_to_process=test_ids_to_process,
+            ids_to_process=data_subset.ids_to_process(source_test_id_list),
             mean=mean,
             stdev=stdev,
         )
@@ -283,15 +297,21 @@ def main():
     source_data_name = (
         args.source_data_name
         if args.processor == "cp"
-        else ("filter_sig" if args.processor in ("correlation",) else None)
+        else (filter_sig_meta.data_name if args.processor in ("correlation",) else None)
     )
+
+    if args.processor == "cp":
+        dest_data_name = args.dest_data_name
+    else:
+        processor_meta = meta_for_processor_name(args.processor)
+        dest_data_name = processor_meta.data_name
 
     preprocess(
         process_fns[args.processor],
         args.source,
         source_data_name,
         args.dest,
-        args.dest_data_name if args.processor == "cp" else args.processor,
+        dest_data_name,
         data_subset,
     )
 
