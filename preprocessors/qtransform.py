@@ -3,11 +3,11 @@ from typing import Tuple, cast
 import numpy as np
 from scipy.signal.windows import tukey
 
-from gw_data import N_SIGNALS
+from gw_data import N_SIGNALS, SIGNAL_LEN, SIGNAL_SECS
 from gw_processing import timeseries_from_signal
-from preprocessor_meta import qtransform_meta, FILTER_LEN, FILTER_SECS
+from preprocessor_meta import qtransform_meta
 
-WINDOW = tukey(FILTER_LEN, alpha=0.1)
+WINDOW = tukey(SIGNAL_LEN, alpha=0.1)
 
 
 def qtransform_sig(
@@ -28,12 +28,11 @@ def qtransform_sig(
     freqs: np.ndarray
     qplane: np.ndarray
     times, freqs, qplane = windowed.qtransform(
-        delta_t=FILTER_SECS / output_shape[1],
+        delta_t=SIGNAL_SECS / output_shape[1],
         frange=(25, 500),
         logfsteps=output_shape[0],
         return_complex=True,
     )
-    assert qplane.shape == output_shape
     return times, freqs, qplane
 
 
@@ -45,12 +44,14 @@ def process_sig(sig: np.ndarray, output_shape: Tuple[int, int]) -> np.ndarray:
 def process_given_shape(
     sigs: np.ndarray, output_shape: Tuple[int, int, int]
 ) -> np.ndarray:
-    if sigs.shape != (N_SIGNALS, FILTER_LEN):
+    if sigs.shape != (N_SIGNALS, SIGNAL_LEN):
         raise ValueError(f"unexpected sigs shape: {sigs.shape}")
     planes = [process_sig(sig, output_shape[1:]) for sig in sigs]
     real_planes = [np.real(plane) for plane in planes]
     complex_planes = [np.imag(plane) for plane in planes]
-    return np.array(real_planes + complex_planes)
+    result = np.array(real_planes + complex_planes)
+    assert result.shape == output_shape
+    return result
 
 
 def process(sigs: np.ndarray) -> np.ndarray:
