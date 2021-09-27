@@ -48,9 +48,9 @@ class DataAll(DataSubset):
 
 
 class DataN(DataSubset):
-    def __init__(self, spec: str):
+    def __init__(self, n: int):
         super().__init__(covers_all_training_data=False, process_test_data=False)
-        self.n = int(spec)
+        self.n = n
 
     def ids_to_process(self, source_ids: List[str]) -> Set[str]:
         if self.n > len(source_ids):
@@ -61,14 +61,16 @@ class DataN(DataSubset):
 
 
 class DataPartition(DataSubset):
-    def __init__(self, spec: str):
-        super().__init__(covers_all_training_data=True, process_test_data=True)
+    def __init__(self, spec: str, n: Optional[int]):
+        super().__init__(
+            covers_all_training_data=(n is None), process_test_data=(n is None)
+        )
+        self.n = n
         if not re.fullmatch(r"\d+/\d+", spec):
             raise ValueError("must specify data partition as P/N")
-        p_str, n_str = spec.split("/")
-
-        self.partition = int(p_str)
-        self.num_partitions = int(n_str)
+        part_str, n_parts_str = spec.split("/")
+        self.partition = int(part_str)
+        self.num_partitions = int(n_parts_str)
         if self.partition < 1 or self.partition > self.num_partitions:
             raise ValueError(
                 f"partition {self.partition} not between 1 and {self.num_partitions}"
@@ -80,12 +82,13 @@ class DataPartition(DataSubset):
             sleep(10)
 
     def ids_to_process(self, source_ids: List[str]) -> Set[str]:
-        partition_size = len(source_ids) // self.num_partitions
+        total_data_size = min(len(source_ids), self.n) if self.n else len(source_ids)
+        partition_size = total_data_size // self.num_partitions
         start = (self.partition - 1) * partition_size
         end = (
             self.partition * partition_size
             if self.partition < self.num_partitions
-            else len(source_ids)
+            else total_data_size
         )
         return set(source_ids[start:end])
 
@@ -240,7 +243,7 @@ def main():
     arg_parser.add_argument(
         "-n",
         help="number of training examples to preprocess (if set, test examples are omitted)",
-        type=DataN,
+        type=int,
     )
     arg_parser.add_argument(
         "--from",
@@ -255,7 +258,6 @@ def main():
     arg_parser.add_argument(
         "--partition",
         help='which partition to process, where "1/6" means partition 1 of 6',
-        type=DataPartition,
     )
     arg_parser.add_argument(
         "processor", help="which processor to run", choices=process_fns.keys()
@@ -272,15 +274,16 @@ def main():
     )
     args = arg_parser.parse_args()
 
-    if args.n and args.partition:
-        print("can't specify both -n and --partition", file=sys.stderr)
-        sys.exit(1)
-    data_subset = args.n or args.partition or DataAll()
+    data_subset = (
+        DataPartition(args.partition, args.n)
+        if args.partition
+        else (DataN(args.n) if args.n else DataAll())
+    )
 
     source_data_name = (
         args.source_data_name
         if args.processor == "cp"
-        else ("filter_sig" if args.processor in ("correlation", "qtransform") else None)
+        else ("filter_sig" if args.processor in ("correlation",) else None)
     )
 
     preprocess(
