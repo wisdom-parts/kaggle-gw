@@ -105,7 +105,7 @@ class Manager(ModelManager):
         n: Optional[int],
         device: torch.device,
         hp: HyperParameters,
-        submission: Optional[int],
+        submission: bool,
     ):
         if not isinstance(hp, SigRnnHp):
             raise ValueError("wrong hyper-parameter class: {hp}")

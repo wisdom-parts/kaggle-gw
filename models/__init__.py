@@ -113,7 +113,7 @@ class MyDatasets:
     gw: GwDataset
     train: Subset[Tuple[Dict[str, Tensor], Tensor]]
     validation: Subset[Tuple[Dict[str, Tensor], Tensor]]
-    test: GwSubmissionDataset
+    test: Optional[GwSubmissionDataset]
 
 
 def gw_train_and_test_datasets(
@@ -122,6 +122,7 @@ def gw_train_and_test_datasets(
     preprocessors: List[PreprocessorMeta],
     dtype: torch.dtype,
     device: torch.device,
+    submission: bool,
 ) -> MyDatasets:
     def transform(x: np.ndarray) -> torch.Tensor:
         return torch.tensor(x, dtype=dtype, device=device)
@@ -136,11 +137,16 @@ def gw_train_and_test_datasets(
         transform=transform,
         target_transform=target_transform,
     )
-    test = GwSubmissionDataset(data_dir, preprocessors, transform=transform)
     num_examples = len(gw)
     num_train_examples = int(num_examples * 0.8)
     num_validation_examples = num_examples - num_train_examples
     train, validation = random_split(gw, [num_train_examples, num_validation_examples])
+
+    test = (
+        GwSubmissionDataset(data_dir, preprocessors, transform=transform)
+        if submission
+        else None
+    )
     return MyDatasets(gw, train, validation, test)
 
 
@@ -311,9 +317,11 @@ class ModelManager(ABC):
         n: Optional[int],
         preprocessors: List[PreprocessorMeta],
         hp: "HyperParameters",
-        submission: Optional[int],
+        submission: bool,
     ):
-        data = gw_train_and_test_datasets(data_dir, n, preprocessors, hp.dtype, device)
+        data = gw_train_and_test_datasets(
+            data_dir, n, preprocessors, hp.dtype, device, submission
+        )
         model.to(device, dtype=hp.dtype)
         loss_fn = nn.BCEWithLogitsLoss()
         wandb.watch(model, criterion=loss_fn, log="all", log_freq=100)
@@ -371,6 +379,10 @@ class ModelManager(ABC):
 
         print("Preparing submission.")
         if submission:  # we want to prepare test data
+            if not data.test:
+                raise RuntimeError(
+                    "We are supposed to prepare a submission, but we didn't create a test dataset!"
+                )
             self._test(model, data.test, hp.batch)
 
         print("Done!")
