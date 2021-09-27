@@ -198,15 +198,15 @@ class ModelManager(ABC):
             batch: int,
     ):
         fields = ['id', 'target']
-        test_dataloader = DataLoader(test, batch_size=batch)
+        test_dataloader = DataLoader(test, batch_size=batch, shuffle=False)
         with open("submissions.csv", "w") as csvfile:
             csvwriter = csv.writer(csvfile)
             csvwriter.writerow(fields)
             for batch_num, (x, _id) in enumerate(test_dataloader):
-                pred = model(x)
-                m = torch.nn.Sigmoid()
-                op = m(pred).data.cpu().numpy()[0]
-                csvwriter.writerow([_id, op])
+                preds = model(x)
+                op = preds.data.cpu().numpy()
+                for i in range(batch):
+                    csvwriter.writerow([_id[i], op[i]])
         print("Finished writing to submissions.csv!")
 
     def _store_the_model(self, model: nn.Module, optimizer: nn.Module, hp: "HyperParameters"):
