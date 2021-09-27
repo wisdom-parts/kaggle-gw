@@ -12,8 +12,8 @@ FILTER_LEN = SIGNAL_LEN - 2 * FILTER_CROP
 FILTER_SECS = FILTER_LEN * SIGNAL_DELTA_T
 FILTER_TIMES = SIGNAL_TIMES[FILTER_CROP:-FILTER_CROP]
 
-QT_FREQ_STEPS = 64
-QT_TIME_STEPS_PER_SEC = 128
+QT_FREQ_STEPS = 128
+QT_TIME_STEPS_PER_SEC = 64
 QT_TIME_STEPS = round(SIGNAL_SECS * QT_TIME_STEPS_PER_SEC)
 QT_OUTPUT_SHAPE = (N_SIGNALS, QT_FREQ_STEPS, QT_TIME_STEPS)
 
@@ -29,6 +29,7 @@ RAW_PREPROCESSOR_NAME = "raw"
 @dataclass
 class PreprocessorMeta:
     name: str
+    version: int
     output_shape: Tuple[int, ...]
 
     @property
@@ -36,17 +37,19 @@ class PreprocessorMeta:
         if self.name == RAW_PREPROCESSOR_NAME:
             return None
         else:
-            return self.name
+            return self.name + str(self.version)
 
 
-raw_meta = PreprocessorMeta(RAW_PREPROCESSOR_NAME, (N_SIGNALS, SIGNAL_LEN))
+raw_meta = PreprocessorMeta(RAW_PREPROCESSOR_NAME, 1, (N_SIGNALS, SIGNAL_LEN))
 filter_sig_meta = PreprocessorMeta(
-    "filter_sig", (N_SIGNALS, SIGNAL_LEN - 2 * FILTER_CROP)
+    "filter_sig", 2, (N_SIGNALS, SIGNAL_LEN - 2 * FILTER_CROP)
 )
 qtransform_meta = PreprocessorMeta(
-    "qtransform", (N_SIGNALS, QT_FREQ_STEPS, QT_TIME_STEPS)
+    "qtransform", 3, (N_SIGNALS * 2, QT_FREQ_STEPS, QT_TIME_STEPS)
 )
-correlation_meta = PreprocessorMeta("correlation", (CORR_NUM_LAGS, 2, CORR_NUM_WINDOWS))
+correlation_meta = PreprocessorMeta(
+    "correlation", 2, (CORR_NUM_LAGS, 2, CORR_NUM_WINDOWS)
+)
 
 
 class Preprocessor(Enum):

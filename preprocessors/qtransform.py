@@ -13,7 +13,6 @@ WINDOW = tukey(FILTER_LEN, alpha=0.1)
 def qtransform_sig(
     sig: np.ndarray,
     output_shape: Tuple[int, int],
-    avoid_normalization=True,
 ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     """
     Performs a qtransform on sig, returning
@@ -30,17 +29,17 @@ def qtransform_sig(
     qplane: np.ndarray
     times, freqs, qplane = windowed.qtransform(
         delta_t=FILTER_SECS / output_shape[1],
-        frange=(30, 350),
+        frange=(25, 500),
         logfsteps=output_shape[0],
-        return_complex=avoid_normalization,
+        return_complex=True,
     )
     assert qplane.shape == output_shape
-    return times, freqs, abs(qplane) if avoid_normalization else qplane
+    return times, freqs, qplane
 
 
 def process_sig(sig: np.ndarray, output_shape: Tuple[int, int]) -> np.ndarray:
-    _, _, result = qtransform_sig(sig, output_shape)
-    return result
+    _, _, plane = qtransform_sig(sig, output_shape)
+    return plane
 
 
 def process_given_shape(
@@ -48,7 +47,10 @@ def process_given_shape(
 ) -> np.ndarray:
     if sigs.shape != (N_SIGNALS, FILTER_LEN):
         raise ValueError(f"unexpected sigs shape: {sigs.shape}")
-    return np.array([process_sig(sig, output_shape[1:]) for sig in sigs])
+    planes = [process_sig(sig, output_shape[1:]) for sig in sigs]
+    real_planes = [np.real(plane) for plane in planes]
+    complex_planes = [np.imag(plane) for plane in planes]
+    return np.array(real_planes + complex_planes)
 
 
 def process(sigs: np.ndarray) -> np.ndarray:
