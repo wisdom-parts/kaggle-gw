@@ -1,6 +1,6 @@
 from dataclasses import dataclass, asdict
 from enum import Enum, auto
-from typing import Type
+from typing import Type, Dict
 
 import torch
 import wandb
@@ -15,7 +15,7 @@ from models import HyperParameters, ModelManager
 
 @argsclass(name="q_eff")
 @dataclass
-class QEfficientNetHP(HyperParameters):
+class QEfficientNetHp(HyperParameters):
     batch: int = 64
     epochs: int = 100
     lr: float = 0.0003
@@ -28,12 +28,12 @@ class QEfficientNetHP(HyperParameters):
 
 class EfficientNet(nn.Module):
     """
-    Applies a CNN to the output of preprocess qtransform and produces two logits as output.
+    Applies a CNN to the output of preprocess qtransform and produces one logit as output.
     input size: (batch_size, ) + preprocess.qtransform.OUTPUT_SHAPE
-    output size: (batch_size, 2)
+    output size: (batch_size, 1)
     """
 
-    def __init__(self, device: torch.device, hp: QEfficientNetHP):
+    def __init__(self, device: torch.device, hp: QEfficientNetHp):
         super().__init__()
         self.hp = hp
         self.device = device
@@ -41,7 +41,8 @@ class EfficientNet(nn.Module):
         n_features = self.net._fc.in_features
         self.net._fc = nn.Linear(in_features=n_features, out_features=1, bias=True)
 
-    def forward(self, x: Tensor) -> Tensor:
+    def forward(self, xd: Dict[str, Tensor]) -> Tensor:
+        x = xd[qtransform_meta.name]
         assert x.size()[1:] == qtransform_meta.output_shape
         out = self.net(x)
         return out
@@ -55,7 +56,7 @@ class Manager(ModelManager):
         device: torch.device,
         hp: HyperParameters,
     ):
-        if not isinstance(hp, QEfficientNetHP):
+        if not isinstance(hp, QEfficientNetHp):
             raise ValueError("wrong hyper-parameter class: {hp}")
 
         wandb.init(project="g2net-" + __name__, entity="wisdom", config=asdict(hp))

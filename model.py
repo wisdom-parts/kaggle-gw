@@ -5,18 +5,19 @@ from typing import Union, Optional
 from datargs import arg, parse
 
 from models import train_model, ModelManager
+from models.kitchen_sink import KitchenSinkHp
 from models.q_cnn import QCnnHp
-from models.q_efficient_net import QEfficientNetHP
+from models.q_efficient_net import QEfficientNetHp
 from models.q_resnet import QResnetHp
-from models.sig_cnn import SigCnnHp
+from models.cnn1d import Cnn1dHp
 from models.sig_rnn import SigRnnHp
 
 
 @dataclass
 class Args:
-    model: Union[SigRnnHp, SigCnnHp, QCnnHp, QResnetHp, QEfficientNetHP] = arg(
-        positional=True, help="which model to train"
-    )
+    model: Union[
+        SigRnnHp, Cnn1dHp, QCnnHp, QResnetHp, QEfficientNetHp, KitchenSinkHp
+    ] = arg(positional=True, help="which model to train")
     data_dir: Path = arg(
         positional=True,
         help=(

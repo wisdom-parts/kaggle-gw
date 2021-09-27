@@ -1,0 +1,1 @@
+mamba env create --force -f environment.yml
