@@ -26,7 +26,7 @@ from preprocessor_meta import Preprocessor, PreprocessorMeta
 
 class STFTInputLayer(nn.Module):
     hop_len = 64
-    nn_nft = 4096
+    nn_fft = 4096
 
     def __init__(self, in_shape: Tuple[int, ...]):
         super().__init__()
@@ -42,10 +42,8 @@ class STFTInputLayer(nn.Module):
         self.bn = nn.BatchNorm2d(N_SIGNALS)
 
     def forward(self, x: Tensor) -> Tensor:
-        # CQT2010v2 doesn't support separate batch and channel dimensions, so combine them.
         # x here is (600, 3, 4096)
-        x = torch.flatten(x, start_dim=0, end_dim=1)
-        out = torch.stft(x, n_fft=self.nn_fft, hop_length=self.hop_len)
+        out = torch.stft(torch.flatten(x, start_dim=0, end_dim=1), n_fft=self.nn_fft, hop_length=self.hop_len)
         # out shape is [1800, 2049, 65, 2])
         out_A = out[:, :, :, 0]
         out_B = out[:, :, :, 1]
