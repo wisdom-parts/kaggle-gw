@@ -22,39 +22,39 @@ from models import (
 @argsclass(name="q_cnn2")
 @dataclass
 class QCnn2Hp(HpWithRegressionHead):
-    batch: int = 256
-    epochs: int = 1
-    lr: float = 0.001
+    batch: int = 400
+    epochs: int = 2
+    lr: float = 0.015
     dtype: torch.dtype = torch.float32
 
     linear1drop: float = 0.0
-    linear1out: int = 64  # if this value is 1, then omit linear2
+    linear1out: int = 180  # if this value is 1, then omit linear2
     head: RegressionHead = RegressionHead.LINEAR
 
     preprocessor: Preprocessor = Preprocessor.QTRANSFORM3
 
     convlayers: int = 4
 
-    tallconv: int = 2
+    tallconv: int = 3
 
-    conv1w: int = 1
+    conv1w: int = 5
     conv1stridew: int = 1
-    conv1out: int = 200
+    conv1out: int = 330
     mp1w: int = 1
 
-    conv2w: int = 3
+    conv2w: int = 13
     conv2stridew: int = 1
-    conv2out: int = 200
-    mp2w: int = 1
+    conv2out: int = 750
+    mp2w: int = 2
 
-    conv3w: int = 15
-    conv3stridew: int = 4
-    conv3out: int = 200
+    conv3w: int = 9
+    conv3stridew: int = 2
+    conv3out: int = 240
     mp3w: int = 2
 
-    conv4w: int = 5
-    conv4stridew: int = 1
-    conv4out: int = 200
+    conv4w: int = 9
+    conv4stridew: int = 2
+    conv4out: int = 280
     mp4w: int = 2
 
     @property
