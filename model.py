@@ -14,13 +14,20 @@ from models.q_efficient_net import QEfficientNetHp
 from models.q_resnet import QResnetHp
 from models.cnn1d import Cnn1dHp
 from models.sig_rnn import SigRnnHp
-from models.cnn1d_w_stft import Cnn1dSTFTHp
+
+# from models.cnn1d_w_stft import Cnn1dSTFTHp
 
 
 @dataclass
 class Args:
     model: Union[
-        SigRnnHp, Cnn1dHp, QCnnHp, QCnn2Hp, QResnetHp, QEfficientNetHp, KitchenSinkHp, Cnn1dSTFTHp
+        SigRnnHp,
+        Cnn1dHp,
+        QCnnHp,
+        QCnn2Hp,
+        QResnetHp,
+        QEfficientNetHp,
+        KitchenSinkHp,  # , Cnn1dSTFTHp
     ] = arg(positional=True, help="which model to train")
     data_dir: Path = arg(
         positional=True,
@@ -50,4 +57,4 @@ if __name__ == "__main__":
         )
         sys.exit(1)
     manager: ModelManager = args.model.manager_class()
-    train_model(manager, args.data_dir, args.n, args.model, args.submission)
+    train_model(manager, args.data_dir, args.n, args.model, bool(args.submission))

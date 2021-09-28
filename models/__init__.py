@@ -28,7 +28,7 @@ def to_odd(i: int) -> int:
     return (i // 2) * 2 + 1
 
 
-class GwSubmissionDataset(Dataset[Dict[str, Tensor]]):
+class GwSubmissionDataset(Dataset[Tuple[Dict[str, Tensor], str]]):
     """
     Represents the test data of the g2net data directory as Tensors.
     """
