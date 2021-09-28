@@ -11,12 +11,13 @@ from models.q_efficient_net import QEfficientNetHp
 from models.q_resnet import QResnetHp
 from models.cnn1d import Cnn1dHp
 from models.sig_rnn import SigRnnHp
+from models.cnn1d_w_stft import Cnn1dSTFTHp
 
 
 @dataclass
 class Args:
     model: Union[
-        SigRnnHp, Cnn1dHp, QCnnHp, QResnetHp, QEfficientNetHp, KitchenSinkHp
+        SigRnnHp, Cnn1dHp, QCnnHp, QResnetHp, QEfficientNetHp, KitchenSinkHp, Cnn1dSTFTHp
     ] = arg(positional=True, help="which model to train")
     data_dir: Path = arg(
         positional=True,

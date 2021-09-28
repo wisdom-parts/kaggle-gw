@@ -60,9 +60,9 @@ class InputLayer(Enum):
     CQT = auto()
 
 
-@argsclass(name="cnn1d")
+@argsclass(name="cnn1dstft")
 @dataclass
-class Cnn1dHp(HpWithRegressionHead):
+class Cnn1dSTFTHp(HpWithRegressionHead):
     batch: int = 600
     epochs: int = 1
     lr: float = 0.01
@@ -132,7 +132,7 @@ class ConvBlock(nn.Module):
         return out
 
 
-class Cnn1d(nn.Module):
+class Cnn1dSTFT(nn.Module):
     """
     Takes an input of at least two dimensions, with the last treated as in_width and the rest
     treated as channels. Applies a 1D cnn to product an output shaped (out_channels, out_width),
@@ -140,7 +140,7 @@ class Cnn1d(nn.Module):
     front of every shape.)
     """
 
-    def __init__(self, hp: Cnn1dHp, apply_final_activation: bool):
+    def __init__(self, hp: Cnn1dSTFTHp, apply_final_activation: bool):
         super().__init__()
         self.hp = hp
         self.apply_final_activation = apply_final_activation
@@ -158,7 +158,7 @@ class Cnn1d(nn.Module):
 
         if len(in_shape) < 2:
             raise ValueError(
-                f"Cnn1d requires at least 2 dimensions; got {len(in_shape)}"
+                f"Cnn1dSTFT requires at least 2 dimensions; got {len(in_shape)}"
             )
         conv_in_channels = int(np.prod(conv_in_shape[0:-1]))
         conv_in_w = conv_in_shape[-1]
@@ -224,7 +224,7 @@ class Cnn1d(nn.Module):
 
 
 class Model(nn.Module):
-    def __init__(self, cnn: nn.Module, head: nn.Module, hp: Cnn1dHp):
+    def __init__(self, cnn: nn.Module, head: nn.Module, hp: Cnn1dSTFTHp):
         super().__init__()
         self.cnn = cnn
         self.head = head
@@ -243,7 +243,7 @@ class Manager(ModelManager):
         hp: HyperParameters,
         submission: bool,
     ):
-        if not isinstance(hp, Cnn1dHp):
+        if not isinstance(hp, Cnn1dSTFTHp):
             raise ValueError("wrong hyper-parameter class: {hp}")
 
         wandb.init(project="g2net-" + __name__, entity="wisdom", config=asdict(hp))
@@ -251,7 +251,7 @@ class Manager(ModelManager):
         head_class: Union[Type[MaxHead], Type[LinearHead]] = (
             MaxHead if hp.head == RegressionHead.MAX else LinearHead
         )
-        cnn = Cnn1d(hp, head_class.apply_activation_before_input)
+        cnn = Cnn1dSTFT(hp, head_class.apply_activation_before_input)
         head = head_class(hp, cnn.output_shape)
         model = Model(cnn, head, hp)
 
