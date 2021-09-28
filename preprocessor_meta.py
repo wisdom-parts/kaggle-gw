@@ -12,10 +12,15 @@ FILTER_LEN = SIGNAL_LEN - 2 * FILTER_CROP
 FILTER_SECS = FILTER_LEN * SIGNAL_DELTA_T
 FILTER_TIMES = SIGNAL_TIMES[FILTER_CROP:-FILTER_CROP]
 
-QT_FREQ_STEPS = 128
-QT_TIME_STEPS_PER_SEC = 64
-QT_TIME_STEPS = round(SIGNAL_SECS * QT_TIME_STEPS_PER_SEC)
-QT_OUTPUT_SHAPE = (N_SIGNALS, QT_FREQ_STEPS, QT_TIME_STEPS)
+QT2_FREQ_STEPS = 64
+QT2_TIME_STEPS_PER_SEC = 128
+QT2_TIME_STEPS = round(SIGNAL_SECS * QT2_TIME_STEPS_PER_SEC)
+QT2_OUTPUT_SHAPE = (N_SIGNALS, QT2_FREQ_STEPS, QT2_TIME_STEPS)
+
+QT3_FREQ_STEPS = 128
+QT3_TIME_STEPS_PER_SEC = 64
+QT3_TIME_STEPS = round(SIGNAL_SECS * QT3_TIME_STEPS_PER_SEC)
+QT3_OUTPUT_SHAPE = (N_SIGNALS, QT3_FREQ_STEPS, QT3_TIME_STEPS)
 
 CORR_NUM_WINDOWS = 16
 CORR_WINDOW_LEN = SIGNAL_LEN // CORR_NUM_WINDOWS
@@ -44,8 +49,11 @@ raw_meta = PreprocessorMeta(RAW_PREPROCESSOR_NAME, 1, (N_SIGNALS, SIGNAL_LEN))
 filter_sig_meta = PreprocessorMeta(
     "filter_sig", 2, (N_SIGNALS, SIGNAL_LEN - 2 * FILTER_CROP)
 )
-qtransform_meta = PreprocessorMeta(
-    "qtransform", 3, (N_SIGNALS * 2, QT_FREQ_STEPS, QT_TIME_STEPS)
+qtransform2_meta = PreprocessorMeta(
+    "qtransform", 2, (N_SIGNALS, QT2_FREQ_STEPS, QT2_TIME_STEPS)
+)
+qtransform3_meta = PreprocessorMeta(
+    "qtransform", 3, (N_SIGNALS * 2, QT3_FREQ_STEPS, QT3_TIME_STEPS)
 )
 correlation_meta = PreprocessorMeta(
     "correlation", 2, (CORR_NUM_LAGS, 2, CORR_NUM_WINDOWS)
@@ -55,7 +63,8 @@ correlation_meta = PreprocessorMeta(
 class Preprocessor(Enum):
     RAW = raw_meta
     FILTER_SIG = filter_sig_meta
-    QTRANSFORM = qtransform_meta
+    QTRANSFORM2 = qtransform2_meta
+    QTRANSFORM3 = qtransform3_meta
     CORRELATION = correlation_meta
 
 

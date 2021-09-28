@@ -9,6 +9,7 @@ from gw_data import sample_submission_file
 from models import train_model, ModelManager
 from models.kitchen_sink import KitchenSinkHp
 from models.q_cnn import QCnnHp
+from models.q_cnn2 import QCnn2Hp
 from models.q_efficient_net import QEfficientNetHp
 from models.q_resnet import QResnetHp
 from models.cnn1d import Cnn1dHp
@@ -19,7 +20,7 @@ from models.cnn1d_w_stft import Cnn1dSTFTHp
 @dataclass
 class Args:
     model: Union[
-        SigRnnHp, Cnn1dHp, QCnnHp, QResnetHp, QEfficientNetHp, KitchenSinkHp, Cnn1dSTFTHp
+        SigRnnHp, Cnn1dHp, QCnnHp, QCnn2Hp, QResnetHp, QEfficientNetHp, KitchenSinkHp, Cnn1dSTFTHp
     ] = arg(positional=True, help="which model to train")
     data_dir: Path = arg(
         positional=True,

@@ -290,7 +290,11 @@ class ModelManager(ABC):
 
         validation_loss /= num_batches
         validation_accuracy = 100.0 * correct / num_examples
-        auc_score = roc_auc_score(y_all, pred_all)
+        try:
+            auc_score = roc_auc_score(y_all, pred_all)
+        except ValueError as err:
+            print(f"AUC calculation failed: {err}")
+            auc_score = 0.0
         print(
             f"----\nvalidation metrics: Accuracy: {validation_accuracy:>0.1f}%, Avg loss: {validation_loss:>8f} \n"
         )

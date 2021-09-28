@@ -8,7 +8,7 @@ from torch import nn, Tensor
 
 from gw_data import *
 from models import HyperParameters, ModelManager
-from preprocessor_meta import Preprocessor, qtransform_meta
+from preprocessor_meta import Preprocessor, qtransform3_meta
 
 
 def to_odd(i: int) -> int:
@@ -139,9 +139,9 @@ class CnnResnet(nn.Module):
         )
 
     def forward(self, xd: Dict[str, Tensor]) -> Tensor:
-        x = xd[qtransform_meta.name]
+        x = xd[qtransform3_meta.name]
         batch_size = x.size()[0]
-        assert x.size()[1:] == qtransform_meta.output_shape
+        assert x.size()[1:] == qtransform3_meta.output_shape
         out = self.block1.forward(x)
         assert out.size()[:2] == (batch_size, self.hp.block1out)
         out = self.block2.forward(out)
@@ -171,7 +171,7 @@ class Manager(ModelManager):
             device,
             data_dir,
             n,
-            [qtransform_meta],
+            [qtransform3_meta],
             hp,
             submission,
         )

@@ -15,7 +15,7 @@ from models import (
     HpWithRegressionHead,
     RegressionHead,
 )
-from preprocessor_meta import qtransform_meta, filter_sig_meta
+from preprocessor_meta import qtransform3_meta, filter_sig_meta
 
 
 @argsclass(name="kitchen_sink")
@@ -63,7 +63,7 @@ class Model(nn.Module):
         self.linear2 = nn.Linear(hp.linear1out, 1)
 
     def forward(self, xd: Dict[str, Tensor]) -> Tensor:
-        q_conv_out = self.q_conv(xd[qtransform_meta.name])
+        q_conv_out = self.q_conv(xd[qtransform3_meta.name])
         sig_conv_out = self.sig_conv(xd[filter_sig_meta.name])
         out = torch.cat(
             [
@@ -101,7 +101,7 @@ class Manager(ModelManager):
             device,
             data_dir,
             n,
-            [qtransform_meta, filter_sig_meta],
+            [qtransform3_meta, filter_sig_meta],
             hp,
             submission,
         )

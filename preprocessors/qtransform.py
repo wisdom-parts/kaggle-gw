@@ -5,7 +5,7 @@ from scipy.signal.windows import tukey
 
 from gw_data import N_SIGNALS, SIGNAL_LEN, SIGNAL_SECS
 from gw_processing import timeseries_from_signal
-from preprocessor_meta import qtransform_meta
+from preprocessor_meta import qtransform3_meta
 
 WINDOW = tukey(SIGNAL_LEN, alpha=0.1)
 
@@ -56,5 +56,5 @@ def process_given_shape(
 
 def process(sigs: np.ndarray) -> np.ndarray:
     return process_given_shape(
-        sigs, cast(Tuple[int, int, int], qtransform_meta.output_shape)
+        sigs, cast(Tuple[int, int, int], qtransform3_meta.output_shape)
     )

@@ -89,7 +89,7 @@ class Cnn1dHp(HpWithRegressionHead):
     linear1out: int = 64  # if this value is 1, then omit linear2
     head: RegressionHead = RegressionHead.LINEAR
 
-    preprocessor: Preprocessor = Preprocessor.QTRANSFORM
+    preprocessor: Preprocessor = Preprocessor.QTRANSFORM3
 
     inputlayer: Optional[InputLayer] = None
 

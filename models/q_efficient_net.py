@@ -8,7 +8,7 @@ import efficientnet_pytorch
 from datargs import argsclass
 from torch import nn, Tensor
 
-from preprocessor_meta import Preprocessor, qtransform_meta
+from preprocessor_meta import Preprocessor, qtransform3_meta
 from gw_data import *
 from models import HyperParameters, ModelManager
 
@@ -42,8 +42,8 @@ class EfficientNet(nn.Module):
         self.net._fc = nn.Linear(in_features=n_features, out_features=1, bias=True)
 
     def forward(self, xd: Dict[str, Tensor]) -> Tensor:
-        x = xd[qtransform_meta.name]
-        assert x.size()[1:] == qtransform_meta.output_shape
+        x = xd[qtransform3_meta.name]
+        assert x.size()[1:] == qtransform3_meta.output_shape
         out = self.net(x)
         return out
 
@@ -66,7 +66,7 @@ class Manager(ModelManager):
             device,
             data_dir,
             n,
-            [qtransform_meta],
+            [qtransform3_meta],
             hp,
             submission,
         )

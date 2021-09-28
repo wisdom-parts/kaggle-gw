@@ -19,9 +19,9 @@ from models import (
 )
 
 
-@argsclass(name="q_cnn")
+@argsclass(name="q_cnn2")
 @dataclass
-class QCnnHp(HpWithRegressionHead):
+class QCnn2Hp(HpWithRegressionHead):
     batch: int = 256
     epochs: int = 1
     lr: float = 0.001
@@ -33,41 +33,39 @@ class QCnnHp(HpWithRegressionHead):
 
     preprocessor: Preprocessor = Preprocessor.QTRANSFORM3
 
-    convlayers: int = 3
+    convlayers: int = 4
 
-    conv1h: int = 49
-    conv1w: int = 17
+    conv1h: int = 1
+    conv1w: int = 1
     conv1strideh: int = 1
     conv1stridew: int = 1
-    conv1out: int = 73
-    mp1h: int = 2
-    mp1w: int = 2
+    conv1out: int = 200
+    mp1h: int = 1
+    mp1w: int = 1
 
-    conv2h: int = 17
-    conv2w: int = 97
+    conv2h: int = 6
+    conv2w: int = 3
     conv2strideh: int = 1
     conv2stridew: int = 1
-    conv2out: int = 76
-    mp2h: int = 2
-    mp2w: int = 2
+    conv2out: int = 200
+    mp2h: int = 1
+    mp2w: int = 1
 
-    conv3h: int = 17
-    conv3w: int = 5
-    conv3strideh: int = 1
-    conv3stridew: int = 1
-    conv3out: int = 80
-    mp3h: int = 2
+    conv3h: int = 6
+    conv3w: int = 15
+    conv3strideh: int = 6
+    conv3stridew: int = 4
+    conv3out: int = 200
+    mp3h: int = 1
     mp3w: int = 2
 
-    conv4h: int = 3
+    conv4h: int = 1
     conv4w: int = 5
     conv4strideh: int = 1
     conv4stridew: int = 1
-    conv4out: int = 20
-    mp4h: int = 2
+    conv4out: int = 200
+    mp4h: int = 1
     mp4w: int = 2
-
-    convdrop: float = 0.0  # Unused (oops)
 
     @property
     def manager_class(self) -> Type[ModelManager]:
@@ -129,14 +127,14 @@ class ConvBlock(nn.Module):
         return s(0), s(1)
 
 
-class Cnn(nn.Module):
+class Cnn2(nn.Module):
     """
-    Applies a CNN to qtransform data and produces an output shaped like
-    (batch, channels, height, width). Dimension sizes depend on
+    Applies a 2d CNN "edge on": treats the number of signals as h, time as w, and frequency as channel.
+    Produces an output shaped like (batch, channels, height, width). Dimension sizes depend on
     hyper-parameters.
     """
 
-    def __init__(self, hp: QCnnHp, apply_final_activation: bool):
+    def __init__(self, hp: QCnn2Hp, apply_final_activation: bool):
         super().__init__()
         self.hp = hp
         self.apply_final_activation = apply_final_activation
@@ -144,18 +142,18 @@ class Cnn(nn.Module):
         preprocessor_meta: PreprocessorMeta = hp.preprocessor.value
 
         self.cb1 = ConvBlock(
-            in_channels=preprocessor_meta.output_shape[0],
+            in_channels=preprocessor_meta.output_shape[1],
             out_channels=hp.conv1out,
             kernel_size=(hp.conv1h, hp.conv1w),
             stride=(hp.conv1strideh, hp.conv1stridew),
             mp_size=(hp.mp1h, hp.mp1w),
         )
 
-        in_size: Tuple[int, int] = (
-            hp.preprocessor.value.output_shape[1],
+        conv_in_size: Tuple[int, int] = (
+            hp.preprocessor.value.output_shape[0],
             hp.preprocessor.value.output_shape[2],
         )
-        self.conv_out_size = self.cb1.out_size(in_size)
+        self.conv_out_size = self.cb1.out_size(conv_in_size)
         if hp.convlayers > 1:
             self.cb2 = ConvBlock(
                 in_channels=hp.conv1out,
@@ -199,8 +197,10 @@ class Cnn(nn.Module):
         self.output_shape = (self.conv_out_features,) + self.conv_out_size
 
     def forward(self, x: Tensor) -> Tensor:
+        # Use frequency as channel and signals as height
+        out = x.transpose(1, 2)
         out = self.cb1(
-            x, use_activation=self.hp.convlayers > 1 or self.apply_final_activation
+            out, use_activation=self.hp.convlayers > 1 or self.apply_final_activation
         )
         if self.hp.convlayers > 1:
             out = self.cb2(
@@ -218,7 +218,7 @@ class Cnn(nn.Module):
 
 
 class Model(nn.Module):
-    def __init__(self, cnn: nn.Module, head: nn.Module, hp: QCnnHp):
+    def __init__(self, cnn: nn.Module, head: nn.Module, hp: QCnn2Hp):
         super().__init__()
         self.cnn = cnn
         self.head = head
@@ -237,7 +237,7 @@ class Manager(ModelManager):
         hp: HyperParameters,
         submission: bool,
     ):
-        if not isinstance(hp, QCnnHp):
+        if not isinstance(hp, QCnn2Hp):
             raise ValueError("wrong hyper-parameter class: {hp}")
 
         wandb.init(project="g2net-" + __name__, entity="wisdom", config=asdict(hp))
@@ -245,7 +245,7 @@ class Manager(ModelManager):
         head_class: Union[Type[MaxHead], Type[LinearHead]] = (
             MaxHead if hp.head == RegressionHead.MAX else LinearHead
         )
-        cnn = Cnn(hp, head_class.apply_activation_before_input)
+        cnn = Cnn2(hp, head_class.apply_activation_before_input)
         head = head_class(hp, cnn.output_shape)
         model = Model(cnn, head, hp)
 
