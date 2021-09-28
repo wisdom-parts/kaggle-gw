@@ -35,36 +35,26 @@ class QCnn2Hp(HpWithRegressionHead):
 
     convlayers: int = 4
 
-    conv1h: int = 1
+    tallconv: int = 2
+
     conv1w: int = 1
-    conv1strideh: int = 1
     conv1stridew: int = 1
     conv1out: int = 200
-    mp1h: int = 1
     mp1w: int = 1
 
-    conv2h: int = 6
     conv2w: int = 3
-    conv2strideh: int = 1
     conv2stridew: int = 1
     conv2out: int = 200
-    mp2h: int = 1
     mp2w: int = 1
 
-    conv3h: int = 6
     conv3w: int = 15
-    conv3strideh: int = 6
     conv3stridew: int = 4
     conv3out: int = 200
-    mp3h: int = 1
     mp3w: int = 2
 
-    conv4h: int = 1
     conv4w: int = 5
-    conv4strideh: int = 1
     conv4stridew: int = 1
     conv4out: int = 200
-    mp4h: int = 1
     mp4w: int = 2
 
     @property
@@ -77,28 +67,29 @@ class QCnn2Hp(HpWithRegressionHead):
                 "convlayers must be between 1 and 4; was {self.convlayers}"
             )
 
-        self.conv1h = to_odd(self.conv1h)
         self.conv1w = to_odd(self.conv1w)
-
-        self.conv2h = to_odd(self.conv2h)
         self.conv2w = to_odd(self.conv2w)
-
-        self.conv3h = to_odd(self.conv3h)
         self.conv3w = to_odd(self.conv3w)
-
-        self.conv4h = to_odd(self.conv4h)
         self.conv4w = to_odd(self.conv4w)
 
 
 class ConvBlock(nn.Module):
-    def __init__(self, in_channels, out_channels, kernel_size, stride, mp_size):
+    def __init__(
+        self,
+        in_channels: int,
+        out_channels: int,
+        kernel_size: Tuple[int, int],
+        stride: Tuple[int, int],
+        mp_width: int,
+    ):
         super().__init__()
-        self.mp_size = mp_size
+        self.kernel_size = kernel_size
         self.stride = stride
+        self.mp_width = mp_width
 
-        if kernel_size[0] % 2 == 0 or kernel_size[1] % 2 == 0:
-            raise ValueError(f"mp_size must be odd; was {kernel_size}")
-        padding = (kernel_size[0] // 2, kernel_size[1] // 2)
+        if kernel_size[1] % 2 == 0:
+            raise ValueError(f"kernel width must be odd; was {kernel_size}")
+        padding = (0, kernel_size[1] // 2)
 
         self.conv = nn.Conv2d(
             in_channels=in_channels,
@@ -107,7 +98,7 @@ class ConvBlock(nn.Module):
             stride=stride,
             padding=padding,
         )
-        self.mp = nn.MaxPool2d(mp_size) if mp_size[0] > 1 or mp_size[1] > 1 else None
+        self.mp = nn.MaxPool2d((1, mp_width)) if mp_width > 1 else None
         self.bn = nn.BatchNorm2d(out_channels)
         self.activation = nn.ReLU()
 
@@ -121,10 +112,21 @@ class ConvBlock(nn.Module):
         return out
 
     def out_size(self, in_size: Tuple[int, int]) -> Tuple[int, int]:
-        def s(i: int) -> int:
-            return in_size[i] // self.stride[i] // self.mp_size[i]
-
-        return s(0), s(1)
+        if self.kernel_size[0] == 1:
+            if self.stride[0] != 1:
+                raise ValueError(
+                    f"given kernel height of 1, vertical stride must be 1; stride={self.stride}"
+                )
+            s0 = in_size[0]
+        elif self.kernel_size[0] == in_size[0]:
+            if self.stride[0] != in_size[0]:
+                raise ValueError(
+                    f"given kernel height of in_size[0], vertical stride must be the same; stride={self.stride}"
+                )
+            s0 = 1
+        else:
+            raise ValueError("kernel height must be either 1 or input height")
+        return s0, in_size[1] // self.stride[1] // self.mp_width
 
 
 class Cnn2(nn.Module):
@@ -140,13 +142,19 @@ class Cnn2(nn.Module):
         self.apply_final_activation = apply_final_activation
 
         preprocessor_meta: PreprocessorMeta = hp.preprocessor.value
+        in_shape = preprocessor_meta.output_shape
+
+        # We don't need the 0th entry here, but it comes along for the ride.
+        height = [
+            (in_shape[0] if hp.tallconv == i else 1) for i in range(hp.convlayers + 1)
+        ]
 
         self.cb1 = ConvBlock(
-            in_channels=preprocessor_meta.output_shape[1],
+            in_channels=in_shape[1],
             out_channels=hp.conv1out,
-            kernel_size=(hp.conv1h, hp.conv1w),
-            stride=(hp.conv1strideh, hp.conv1stridew),
-            mp_size=(hp.mp1h, hp.mp1w),
+            kernel_size=(height[1], hp.conv1w),
+            stride=(height[1], hp.conv1stridew),
+            mp_width=hp.mp1w,
         )
 
         conv_in_size: Tuple[int, int] = (
@@ -158,9 +166,9 @@ class Cnn2(nn.Module):
             self.cb2 = ConvBlock(
                 in_channels=hp.conv1out,
                 out_channels=hp.conv2out,
-                kernel_size=(hp.conv2h, hp.conv2w),
-                stride=(hp.conv2strideh, hp.conv2stridew),
-                mp_size=(hp.mp2h, hp.mp2w),
+                kernel_size=(height[2], hp.conv2w),
+                stride=(height[2], hp.conv2stridew),
+                mp_width=hp.mp2w,
             )
             self.conv_out_size = self.cb2.out_size(self.conv_out_size)
 
@@ -168,9 +176,9 @@ class Cnn2(nn.Module):
             self.cb3 = ConvBlock(
                 in_channels=hp.conv2out,
                 out_channels=hp.conv3out,
-                kernel_size=(hp.conv3h, hp.conv3w),
-                stride=(hp.conv3strideh, hp.conv3stridew),
-                mp_size=(hp.mp3h, hp.mp3w),
+                kernel_size=(height[3], hp.conv3w),
+                stride=(height[3], hp.conv3stridew),
+                mp_width=hp.mp3w,
             )
             self.conv_out_size = self.cb3.out_size(self.conv_out_size)
 
@@ -178,9 +186,9 @@ class Cnn2(nn.Module):
             self.cb4 = ConvBlock(
                 in_channels=hp.conv3out,
                 out_channels=hp.conv4out,
-                kernel_size=(hp.conv4h, hp.conv4w),
-                stride=(hp.conv4strideh, hp.conv4stridew),
-                mp_size=(hp.mp4h, hp.mp4w),
+                kernel_size=(height[4], hp.conv4w),
+                stride=(height[4], hp.conv4stridew),
+                mp_width=hp.mp4w,
             )
             self.conv_out_size = self.cb4.out_size(self.conv_out_size)
 

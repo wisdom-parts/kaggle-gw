@@ -381,8 +381,8 @@ class ModelManager(ABC):
         print("Confusion matrix sample:")
         print(repr(confusion_sample))
 
-        print("Preparing submission.")
         if submission:  # we want to prepare test data
+            print("Preparing submission.")
             if not data.test:
                 raise RuntimeError(
                     "We are supposed to prepare a submission, but we didn't create a test dataset!"
