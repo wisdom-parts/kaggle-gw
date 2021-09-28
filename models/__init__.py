@@ -210,11 +210,10 @@ class ModelManager(ABC):
             csvwriter = csv.writer(csvfile)
             csvwriter.writerow(fields)
             for batch_num, (xd, _id) in enumerate(test_dataloader):
-                key = self.preprocessors[0] # TODO: Fix hack!
-                preds = model(xd[key])
+                preds = model(xd)
                 op = preds.data.cpu().numpy()
-                for i in range(batch):
-                    csvwriter.writerow([_id[i], op[i]])
+                for i in range(len(_id)):
+                    csvwriter.writerow([_id[i], op[i][0]])
         print("Finished writing to submissions.csv!")
 
     def _store_the_model(
