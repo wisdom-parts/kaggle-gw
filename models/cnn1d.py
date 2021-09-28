@@ -62,12 +62,14 @@ class CqtInputLayer(nn.Module):
 
     def forward(self, x: Tensor) -> Tensor:
         # CQT2010v2 doesn't support separate batch and channel dimensions, so combine them.
+        # x here is (600, 3, 4096)
         out = self.cqt(torch.flatten(x, start_dim=0, end_dim=1))
+        # out shape is [1800, 48, 257])
         # CQT2010v2 returns a value for each time endpoint. We'd prefer exactly out_w values.
-        out = out[:, :, 0:-1]
+        out = out[:, :, 0:-1] # torch.Size([1800, 48, 256])
         # Separate the batch and channel dimensions again.
-        out = out.view(x.shape[0], *self.output_shape)
-        out = self.bn(out)
+        out = out.view(x.shape[0], *self.output_shape) # torch.Size([600, 3, 48, 256]) outputshape is (3, 48, 256)
+        out = self.bn(out) # same dims (600, 3, 48, 256)
         return out
 
 
