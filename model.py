@@ -30,9 +30,9 @@ class Args:
         default=None,
         help="number of training examples to use",
     )
-    submission: bool = arg(
+    submission: int = arg(
         aliases=["-s"],
-        default=False,
+        default=0,
         help="flag to indicate if prep data for submission",
     )
 

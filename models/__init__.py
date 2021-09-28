@@ -53,7 +53,7 @@ class GwSubmissionDataset(Dataset[Dict[str, Tensor]]):
     def __len__(self):
         return len(self.ids)
 
-    def __getitem__(self, idx: int) -> Dict[str, Tensor]:
+    def __getitem__(self, idx: int) -> Tuple[Dict[str, Tensor], str]:
         _id = self.ids[idx]
 
         xd: Dict[str, Tensor] = {}
@@ -61,7 +61,7 @@ class GwSubmissionDataset(Dataset[Dict[str, Tensor]]):
             fpath = str(test_file(self.data_dir, _id, preprocessor.data_name))
             v = self.transform(np.load(fpath))
             xd[preprocessor.name] = v
-        return xd
+        return xd, _id
 
 
 class GwDataset(Dataset[Tuple[Dict[str, Tensor], Tensor]]):
@@ -210,7 +210,8 @@ class ModelManager(ABC):
             csvwriter = csv.writer(csvfile)
             csvwriter.writerow(fields)
             for batch_num, (xd, _id) in enumerate(test_dataloader):
-                preds = model(xd)
+                key = self.preprocessors[0] # TODO: Fix hack!
+                preds = model(xd[key])
                 op = preds.data.cpu().numpy()
                 for i in range(batch):
                     csvwriter.writerow([_id[i], op[i]])
