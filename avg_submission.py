@@ -8,6 +8,9 @@ import pandas as pd
 
 EXPECTED_COLUMNS = ["id", "target"]
 
+def sigmoid(x):
+    # Access columns here by doing x[0], x[1] etc.
+    return 1./(1.+ np.exp(-x[0]))
 
 def main():
     arg_parser = argparse.ArgumentParser()
@@ -19,6 +22,7 @@ def main():
     )
     args = arg_parser.parse_args()
     dataframes: List[pd.DataFrame]
+    original_df = None
     for path in args.files:
         if not path.exists():
             print(f"file not found: {path}", file=sys.stderr)
@@ -31,7 +35,13 @@ def main():
             )
             exit(1)
         dtypes = df.dtypes
-        exit(0)
+        if original_df is None:
+            original_df = df
+        else:
+            original_df = original_df.merge(df, on="id", how="inner")
+    original_df.apply(sigmoid, axis=1)
+    print (original_df.head())
+    exit(0)
 
 
 if __name__ == "__main__":
