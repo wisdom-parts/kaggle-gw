@@ -6,11 +6,10 @@ from typing import List
 
 import pandas as pd
 
-EXPECTED_COLUMNS = ["id", "target"]
 
-def sigmoid(x):
-    # Access columns here by doing x[0], x[1] etc.
-    return 1./(1.+ np.exp(-x[0]))
+def sigmoid(x: pd.Series) -> pd.Series:
+    return 1.0 / (1.0 + np.exp(-x))
+
 
 def main():
     arg_parser = argparse.ArgumentParser()
@@ -21,27 +20,24 @@ def main():
         type=Path,
     )
     args = arg_parser.parse_args()
-    dataframes: List[pd.DataFrame]
-    original_df = None
+    total_df = None
     for path in args.files:
-        if not path.exists():
-            print(f"file not found: {path}", file=sys.stderr)
-            exit(1)
-        df = pd.read_csv(path, dtype={"id": "string", "target": np.float})
-        if list(df.columns) != EXPECTED_COLUMNS:
-            print(
-                f"each file must have columns {EXPECTED_COLUMNS}; got {list(df.columns)}",
-                file=sys.stderr,
-            )
-            exit(1)
-        dtypes = df.dtypes
-        if original_df is None:
-            original_df = df
+        df = pd.read_csv(
+            path, dtype={"id": "string", "target": "float"}, index_col="id"
+        )
+        df.sort_index(inplace=True)
+        s = sigmoid(df["target"])
+        if total_df is None:
+            total_df = pd.DataFrame({"total": s})
         else:
-            original_df = original_df.merge(df, on="id", how="inner")
-    original_df.apply(sigmoid, axis=1)
-    print (original_df.head())
-    exit(0)
+            if not df.index.equals(total_df.index):
+                print(f"{path} has different ids than previous files", file=sys.stderr)
+                exit(1)
+            total_df = total_df.assign(total=total_df["total"] + s)
+    result_df = pd.DataFrame({"target": total_df["total"] / len(args.files)})
+    # We are getting pandas type definitions that insist the path must be None
+    # noinspection PyTypeChecker
+    result_df.to_csv("avg_submission.csv")
 
 
 if __name__ == "__main__":
