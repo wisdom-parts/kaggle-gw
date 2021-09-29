@@ -9,6 +9,7 @@ import pandas as pd
 EXPECTED_COLUMNS = ["id", "target"]
 
 def sigmoid(x):
+    # Access columns here by doing x[0], x[1] etc.
     return 1./(1.+ np.exp(-x[0]))
 
 def main():
